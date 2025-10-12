@@ -1,0 +1,13 @@
+{
+  "workflow_id": "3EBE513A-F81B-4498-B521-FB19B3A71FA8",
+  "scenario": "Migration Performance Optimization",
+  "mode": "quality",
+  "start_time": "2025-10-12T13:42:33Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}

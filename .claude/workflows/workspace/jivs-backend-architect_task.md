@@ -13,7 +13,7 @@ Design based on planning outputs
 {
   "phase": "planning",
   "outputs": {
-    "sprint_plan": "2-week sprint plan for Dark Mode UI Feature",
+    "sprint_plan": "2-week sprint plan for Code Quality Refactoring Initiative - Reduce code duplication by 50%",
     "feature_priorities": ["P0: Core feature", "P1: Testing", "P2: Documentation"],
     "acceptance_criteria": ["Feature works as specified", "Tests pass", "Compliant with GDPR/CCPA"]
   }

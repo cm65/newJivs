@@ -1,22 +1,22 @@
-# Agent Task: jivs-compliance-checker
+# Agent Task: jivs-project-shipper
 
 ## Task Type
-compliance_validation
+release_management
 
 ## Phase
-compliance
+release
 
 ## Context & Inputs
-Validate GDPR/CCPA compliance
+Prepare and execute release
 
 ## Previous Agent Outputs
 {
-  "phase": "infrastructure",
+  "phase": "compliance",
   "outputs": {
-    "kubernetes_manifests": "Deployment, Service, HPA, ConfigMap",
-    "ci_cd_pipeline": "GitHub Actions with build, test, deploy stages",
-    "monitoring_config": "Prometheus metrics + Grafana dashboards",
-    "backup_jobs": "CronJob for daily PostgreSQL backups"
+    "compliance_report": "GDPR: COMPLIANT, CCPA: COMPLIANT",
+    "audit_trail": "Complete audit logging implemented",
+    "security_issues": "0 CRITICAL, 0 HIGH, 2 MEDIUM, 5 LOW",
+    "compliance_approval": "APPROVED"
   }
 }
 
@@ -27,8 +27,8 @@ Generate structured output that will be consumed by downstream agents.
 ## Output Format
 Provide output in JSON format with the following structure:
 {
-  "agent": "jivs-compliance-checker",
-  "task_type": "compliance_validation",
+  "agent": "jivs-project-shipper",
+  "task_type": "release_management",
   "status": "success|failure",
   "outputs": {
     // Agent-specific outputs

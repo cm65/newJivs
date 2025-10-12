@@ -1,0 +1,15 @@
+{
+  "agent": "jivs-project-shipper",
+  "task_type": "release_management",
+  "phase": "release",
+  "status": "success",
+  "execution_time": "45s",
+  "outputs": {
+    "summary": "Agent jivs-project-shipper completed release_management successfully"
+  },
+  "recommendations": [
+    "Continue to next agent in workflow"
+  ],
+  "next_steps": [],
+  "issues": []
+}

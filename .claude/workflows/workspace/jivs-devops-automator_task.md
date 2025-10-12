@@ -1,13 +1,13 @@
-# Agent Task: jivs-sprint-prioritizer
+# Agent Task: jivs-devops-automator
 
 ## Task Type
-prioritization
+infrastructure
 
 ## Phase
-planning
+infrastructure
 
 ## Context & Inputs
-Feature request: Code Quality Refactoring Initiative - Reduce code duplication by 50%
+Setup based on design
 
 ## Previous Agent Outputs
 {
@@ -30,8 +30,8 @@ Generate structured output that will be consumed by downstream agents.
 ## Output Format
 Provide output in JSON format with the following structure:
 {
-  "agent": "jivs-sprint-prioritizer",
-  "task_type": "prioritization",
+  "agent": "jivs-devops-automator",
+  "task_type": "infrastructure",
   "status": "success|failure",
   "outputs": {
     // Agent-specific outputs
