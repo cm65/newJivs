@@ -1,233 +1,203 @@
 package com.jivs.platform.controller;
 
+import com.jivs.platform.dto.SavedViewDTO;
+import com.jivs.platform.security.UserPrincipal;
+import com.jivs.platform.service.views.ViewsService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 /**
  * REST API controller for saved filter views
+ * Part of Sprint 2 - Workflow 7: Advanced Filtering Implementation
  */
 @RestController
 @RequestMapping("/api/v1/views")
 @RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Saved Views", description = "Saved views management API")
+@SecurityRequirement(name = "bearerAuth")
 @CrossOrigin(origins = "*", maxAge = 3600)
 public class ViewsController {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViewsController.class);
+    private final ViewsService viewsService;
 
     /**
      * Get all saved views for a module
+     *
+     * @param module Module name (extractions, migrations, data-quality, compliance)
+     * @return List of saved views
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
-    public ResponseEntity<List<Map<String, Object>>> getViews(
-            @RequestParam(required = false) String module,
-            Authentication authentication) {
+    @Operation(summary = "Get all views", description = "Get all saved views for a specific module")
+    public ResponseEntity<List<SavedViewDTO>> getViews(
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.debug("Getting saved views for user {} in module {}", userId, module);
 
-        log.info("Getting saved views for module: {}", module);
-
-        try {
-            // TODO: Call ViewsService
-            List<Map<String, Object>> views = new ArrayList<>();
-
-            // Mock personal view
-            Map<String, Object> view1 = new HashMap<>();
-            view1.put("id", UUID.randomUUID().toString());
-            view1.put("name", "My Active Extractions");
-            view1.put("module", module);
-            view1.put("filters", new ArrayList<>());
-            view1.put("sort", new ArrayList<>());
-            view1.put("isShared", false);
-            view1.put("createdBy", authentication.getName());
-            view1.put("createdAt", new Date());
-            views.add(view1);
-
-            // Mock shared view
-            Map<String, Object> view2 = new HashMap<>();
-            view2.put("id", UUID.randomUUID().toString());
-            view2.put("name", "Failed Last 7 Days");
-            view2.put("module", module);
-            view2.put("filters", new ArrayList<>());
-            view2.put("sort", new ArrayList<>());
-            view2.put("isShared", true);
-            view2.put("createdBy", "admin");
-            view2.put("createdAt", new Date());
-            views.add(view2);
-
-            return ResponseEntity.ok(views);
-
-        } catch (Exception e) {
-            log.error("Failed to get views: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+        List<SavedViewDTO> views = viewsService.getViews(userId, module);
+        return ResponseEntity.ok(views);
     }
 
     /**
-     * Get a saved view by ID
+     * Get a specific saved view by name
+     *
+     * @param module Module name
+     * @param viewName View name
+     * @return Saved view
      */
-    @GetMapping("/{id}")
+    @GetMapping("/{viewName}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
-    public ResponseEntity<Map<String, Object>> getView(@PathVariable String id) {
-        log.info("Getting view: {}", id);
+    @Operation(summary = "Get view by name", description = "Get a specific saved view by name")
+    public ResponseEntity<SavedViewDTO> getView(
+            @PathVariable String viewName,
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.debug("Getting view '{}' for user {} in module {}", viewName, userId, module);
 
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> view = new HashMap<>();
-            view.put("id", id);
-            view.put("name", "Sample View");
-            view.put("module", "extractions");
-            view.put("filters", new ArrayList<>());
-            view.put("sort", new ArrayList<>());
-            view.put("isShared", false);
-            view.put("createdBy", "user");
-            view.put("createdAt", new Date());
+        SavedViewDTO view = viewsService.getView(userId, module, viewName);
+        return ResponseEntity.ok(view);
+    }
 
-            return ResponseEntity.ok(view);
+    /**
+     * Get the default view for a module
+     *
+     * @param module Module name
+     * @return Default saved view or 404 if not set
+     */
+    @GetMapping("/default")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
+    @Operation(summary = "Get default view", description = "Get the default view for a module")
+    public ResponseEntity<SavedViewDTO> getDefaultView(
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.debug("Getting default view for user {} in module {}", userId, module);
 
-        } catch (Exception e) {
-            log.error("Failed to get view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "View not found"));
+        SavedViewDTO view = viewsService.getDefaultView(userId, module);
+        if (view == null) {
+            return ResponseEntity.notFound().build();
         }
+
+        return ResponseEntity.ok(view);
     }
 
     /**
      * Create a new saved view
+     *
+     * @param dto Saved view DTO
+     * @return Created view
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> createView(
-            @Valid @RequestBody Map<String, Object> request,
-            Authentication authentication) {
+    @Operation(summary = "Create view", description = "Create a new saved view")
+    public ResponseEntity<SavedViewDTO> createView(
+            @Valid @RequestBody SavedViewDTO dto) {
+        Long userId = getCurrentUserId();
+        log.info("Creating view '{}' for user {} in module {}", dto.getViewName(), userId, dto.getModule());
 
-        log.info("Creating new view: {}", request.get("name"));
-
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", UUID.randomUUID().toString());
-            response.put("name", request.get("name"));
-            response.put("module", request.get("module"));
-            response.put("filters", request.get("filters"));
-            response.put("sort", request.get("sort"));
-            response.put("isShared", request.getOrDefault("isShared", false));
-            response.put("createdBy", authentication.getName());
-            response.put("createdAt", new Date());
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
-        } catch (Exception e) {
-            log.error("Failed to create view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
+        SavedViewDTO createdView = viewsService.createView(userId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdView);
     }
 
     /**
-     * Update an existing view
+     * Update an existing saved view
+     *
+     * @param viewName View name
+     * @param module Module name
+     * @param dto Updated view data
+     * @return Updated view
      */
-    @PutMapping("/{id}")
+    @PutMapping("/{viewName}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> updateView(
-            @PathVariable String id,
-            @Valid @RequestBody Map<String, Object> request,
-            Authentication authentication) {
+    @Operation(summary = "Update view", description = "Update an existing saved view")
+    public ResponseEntity<SavedViewDTO> updateView(
+            @PathVariable String viewName,
+            @RequestParam(required = true) String module,
+            @Valid @RequestBody SavedViewDTO dto) {
+        Long userId = getCurrentUserId();
+        log.info("Updating view '{}' for user {} in module {}", viewName, userId, module);
 
-        log.info("Updating view: {}", id);
-
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("name", request.get("name"));
-            response.put("module", request.get("module"));
-            response.put("filters", request.get("filters"));
-            response.put("sort", request.get("sort"));
-            response.put("isShared", request.getOrDefault("isShared", false));
-            response.put("updatedAt", new Date());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to update view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
+        SavedViewDTO updatedView = viewsService.updateView(userId, module, viewName, dto);
+        return ResponseEntity.ok(updatedView);
     }
 
     /**
      * Delete a saved view
+     *
+     * @param viewName View name
+     * @param module Module name
+     * @return Success message
      */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{viewName}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> deleteView(@PathVariable String id) {
-        log.info("Deleting view: {}", id);
+    @Operation(summary = "Delete view", description = "Delete a saved view")
+    public ResponseEntity<Map<String, String>> deleteView(
+            @PathVariable String viewName,
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.info("Deleting view '{}' for user {} in module {}", viewName, userId, module);
 
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "View deleted successfully");
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to delete view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
+        viewsService.deleteView(userId, module, viewName);
+        return ResponseEntity.ok(Map.of("message", "View deleted successfully"));
     }
 
     /**
-     * Share a view with team
+     * Set a view as the default for a module
+     *
+     * @param viewName View name
+     * @param module Module name
+     * @return Updated view
      */
-    @PostMapping("/{id}/share")
+    @PostMapping("/{viewName}/set-default")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> shareView(@PathVariable String id) {
-        log.info("Sharing view: {}", id);
+    @Operation(summary = "Set default view", description = "Set a view as the default for a module")
+    public ResponseEntity<SavedViewDTO> setDefaultView(
+            @PathVariable String viewName,
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.info("Setting view '{}' as default for user {} in module {}", viewName, userId, module);
 
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("isShared", true);
-            response.put("message", "View shared successfully");
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to share view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
+        SavedViewDTO view = viewsService.setDefaultView(userId, module, viewName);
+        return ResponseEntity.ok(view);
     }
 
     /**
-     * Unshare a view
+     * Get view count for a module
+     *
+     * @param module Module name
+     * @return View count
      */
-    @PostMapping("/{id}/unshare")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> unshareView(@PathVariable String id) {
-        log.info("Unsharing view: {}", id);
+    @GetMapping("/count")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
+    @Operation(summary = "Get view count", description = "Get the count of saved views for a module")
+    public ResponseEntity<Map<String, Long>> getViewCount(
+            @RequestParam(required = true) String module) {
+        Long userId = getCurrentUserId();
+        log.debug("Getting view count for user {} in module {}", userId, module);
 
-        try {
-            // TODO: Call ViewsService
-            Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("isShared", false);
-            response.put("message", "View unshared successfully");
+        long count = viewsService.getViewCount(userId, module);
+        return ResponseEntity.ok(Map.of("count", count));
+    }
 
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Failed to unshare view: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
+    /**
+     * Get current authenticated user's ID from security context
+     */
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return userPrincipal.getId();
     }
 }
