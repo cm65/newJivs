@@ -50,8 +50,8 @@ public class ExtractionService {
             throw new BusinessException("Data source is not active: " + dataSource.getName());
         }
 
-        // Check for running jobs
-        List<ExtractionJob> runningJobs = extractionJobRepository.findRunningJobs();
+        // P0.4: Check for running jobs with optimized query (avoids N+1)
+        List<ExtractionJob> runningJobs = extractionJobRepository.findRunningJobsWithDataSource();
         if (runningJobs.stream().anyMatch(job -> job.getDataSource().getId().equals(dataSourceId))) {
             throw new BusinessException("An extraction job is already running for this data source");
         }
@@ -93,7 +93,8 @@ public class ExtractionService {
     public CompletableFuture<ExtractionJob> executeExtractionJob(String jobId) {
         log.info("Starting extraction job execution: {}", jobId);
 
-        ExtractionJob job = extractionJobRepository.findByJobId(jobId)
+        // P0.4: Use optimized query with JOIN FETCH to eliminate N+1 query
+        ExtractionJob job = extractionJobRepository.findByJobIdWithDataSource(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("ExtractionJob", "jobId", jobId));
 
         try {

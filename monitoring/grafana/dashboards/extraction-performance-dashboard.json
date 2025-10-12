@@ -1,0 +1,400 @@
+{
+  "dashboard": {
+    "title": "JiVS Extraction Performance Dashboard",
+    "uid": "jivs-extraction-perf",
+    "version": 1,
+    "timezone": "browser",
+    "tags": ["jivs", "extraction", "performance"],
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "graph",
+        "title": "Extraction Throughput (records/min)",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(extraction_records_total[1m]) * 60",
+            "legendFormat": "{{source_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Records per Minute",
+            "format": "short"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 20000,
+            "colorMode": "critical",
+            "op": "lt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "API Latency (p95)",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(extraction_duration_bucket[5m]))",
+            "legendFormat": "p95 latency",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(extraction_duration_bucket[5m]))",
+            "legendFormat": "p99 latency",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(extraction_duration_bucket[5m]))",
+            "legendFormat": "p50 latency",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Latency (ms)",
+            "format": "ms"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 200,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Current Throughput",
+        "gridPos": {"x": 0, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(extraction_records_total[1m]) * 60",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "unit": "short"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"value": null, "color": "red"},
+            {"value": 15000, "color": "yellow"},
+            {"value": 20000, "color": "green"}
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "type": "stat",
+        "title": "Cache Hit Rate",
+        "gridPos": {"x": 6, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(extraction_cache_hits[5m])) / (sum(rate(extraction_cache_hits[5m])) + sum(rate(extraction_cache_misses[5m]))) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "unit": "percent"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"value": null, "color": "red"},
+            {"value": 60, "color": "yellow"},
+            {"value": 70, "color": "green"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "type": "stat",
+        "title": "Active Connections",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(extraction_pool_active)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "unit": "short"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"value": null, "color": "green"},
+            {"value": 80, "color": "yellow"},
+            {"value": 100, "color": "red"}
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "type": "stat",
+        "title": "Error Rate",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(extraction_errors_total[5m])) / sum(rate(extraction_records_total[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "unit": "percent"
+        },
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {"value": null, "color": "green"},
+            {"value": 1, "color": "yellow"},
+            {"value": 2, "color": "red"}
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "type": "graph",
+        "title": "Connection Pool Utilization by Source",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "extraction_pool_active",
+            "legendFormat": "{{source_id}} - Active",
+            "refId": "A"
+          },
+          {
+            "expr": "extraction_pool_idle",
+            "legendFormat": "{{source_id}} - Idle",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Connections",
+            "format": "short"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "stack": true
+      },
+      {
+        "id": 8,
+        "type": "graph",
+        "title": "Cache Performance",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(extraction_cache_hits[1m])",
+            "legendFormat": "Cache Hits/s",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(extraction_cache_misses[1m])",
+            "legendFormat": "Cache Misses/s",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Operations per Second",
+            "format": "short"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "type": "graph",
+        "title": "Batch Processing Performance",
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "extraction_batch_size",
+            "legendFormat": "Batch Size (p95)",
+            "refId": "A"
+          },
+          {
+            "expr": "extraction_threads_active",
+            "legendFormat": "Active Threads",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Count",
+            "format": "short"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "type": "graph",
+        "title": "Database Connection Pool (Main HikariCP)",
+        "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "hikaricp_connections_active{pool=\"HikariPool-1\"}",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          },
+          {
+            "expr": "hikaricp_connections_idle{pool=\"HikariPool-1\"}",
+            "legendFormat": "Idle Connections",
+            "refId": "B"
+          },
+          {
+            "expr": "hikaricp_connections{pool=\"HikariPool-1\"}",
+            "legendFormat": "Total Connections",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Connections",
+            "format": "short",
+            "max": 50
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "type": "graph",
+        "title": "Memory Usage",
+        "gridPos": {"x": 0, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+            "legendFormat": "Heap Used",
+            "refId": "A"
+          },
+          {
+            "expr": "jvm_memory_max_bytes{area=\"heap\"}",
+            "legendFormat": "Heap Max",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Bytes",
+            "format": "bytes"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "type": "graph",
+        "title": "GC Pause Time",
+        "gridPos": {"x": 12, "y": 28, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(jvm_gc_pause_seconds_sum[1m])",
+            "legendFormat": "{{gc}} GC Pause Time",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Seconds",
+            "format": "s"
+          },
+          {
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "type": "table",
+        "title": "Top Extraction Jobs by Duration",
+        "gridPos": {"x": 0, "y": 36, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "topk(10, extraction_duration_seconds_sum)",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "job": "Job ID",
+                "source_type": "Source Type",
+                "Value": "Duration (s)"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "source_type",
+          "type": "query",
+          "query": "label_values(extraction_records_total, source_type)",
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    }
+  }
+}
