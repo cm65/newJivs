@@ -1,0 +1,13 @@
+{
+  "workflow_id": "F66D0AAD-E98A-486A-80E9-DEB30BFB982F",
+  "scenario": "Distributed Tracing with Jaeger - End-to-end request tracing across all microservices",
+  "mode": "full",
+  "start_time": "2025-10-12T14:09:36Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}

@@ -1,0 +1,13 @@
+{
+  "workflow_id": "4AC4C0FE-A0D9-45F3-9E56-F836988BB6FF",
+  "scenario": "Multi-Region Deployment - Active-active deployment across US-East, US-West, and EU-West with automatic failover",
+  "mode": "deployment",
+  "start_time": "2025-10-12T14:09:15Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}

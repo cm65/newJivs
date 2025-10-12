@@ -11,13 +11,12 @@ Analyze all test results
 
 ## Previous Agent Outputs
 {
-  "phase": "design",
+  "phase": "infrastructure",
   "outputs": {
-    "service_design": "Spring Boot service with controllers, services, repositories",
-    "api_endpoints": ["/api/v1/feature", "/api/v1/feature/{id}"],
-    "database_schema": "feature_table with columns: id, name, data, created_at",
-    "component_design": "React components: FeatureList, FeatureDetail, FeatureForm",
-    "redux_slices": "featureSlice with CRUD operations"
+    "kubernetes_manifests": "Deployment, Service, HPA, ConfigMap",
+    "ci_cd_pipeline": "GitHub Actions with build, test, deploy stages",
+    "monitoring_config": "Prometheus metrics + Grafana dashboards",
+    "backup_jobs": "CronJob for daily PostgreSQL backups"
   }
 }
 

@@ -1,0 +1,13 @@
+{
+  "workflow_id": "782F8680-5A92-4E6E-892F-694D7E9DD5AB",
+  "scenario": "Automated Compliance Reporting - GDPR and CCPA automated reporting with audit trails",
+  "mode": "full",
+  "start_time": "2025-10-12T14:09:59Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}
