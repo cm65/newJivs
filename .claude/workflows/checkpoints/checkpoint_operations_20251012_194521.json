@@ -1,0 +1,13 @@
+{
+  "workflow_id": "D0E47BBF-80A7-4EAB-80D5-D8D1061DD0B3",
+  "scenario": "AI-Powered Semantic Search - Natural language search with intelligent result ranking",
+  "mode": "full",
+  "start_time": "2025-10-12T14:15:21Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}

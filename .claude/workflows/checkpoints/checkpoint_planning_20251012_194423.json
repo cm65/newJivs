@@ -1,0 +1,13 @@
+{
+  "workflow_id": "7CE6A489-9415-4001-9D5F-83F82AA239F1",
+  "scenario": "Data Lineage Visualization - Interactive data flow visualization from source to destination with impact analysis",
+  "mode": "full",
+  "start_time": "2025-10-12T14:14:22Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}

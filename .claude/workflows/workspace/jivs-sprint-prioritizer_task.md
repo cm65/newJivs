@@ -7,7 +7,7 @@ prioritization
 planning
 
 ## Context & Inputs
-Feature request: Zero-Trust Security Model - Implement zero-trust architecture with mutual TLS and service mesh
+Feature request: Advanced Performance Monitoring Dashboard - Real-time system health metrics with anomaly detection and predictive alerts
 
 ## Previous Agent Outputs
 {

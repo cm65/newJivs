@@ -1,0 +1,13 @@
+{
+  "workflow_id": "C8538050-3C88-4010-A84C-2FAC7F7BABEC",
+  "scenario": "ML-Powered Data Quality Predictions - Machine learning models to predict and prevent data quality issues",
+  "mode": "full",
+  "start_time": "2025-10-12T14:14:51Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}
