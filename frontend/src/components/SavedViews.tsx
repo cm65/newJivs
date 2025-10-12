@@ -55,7 +55,16 @@ const SavedViews: React.FC<SavedViewsProps> = ({
       setViews(data);
       setError(null);
     } catch (err: any) {
-      setError('Failed to load saved views');
+      // Silently handle 404 (endpoint not implemented yet)
+      // or 500 (backend service not ready)
+      const status = err.response?.status;
+      if (status === 404 || status === 500) {
+        // Backend not ready yet, use empty views list
+        setViews([]);
+        setError(null);
+      } else {
+        setError('Failed to load saved views');
+      }
     }
   };
 
@@ -80,7 +89,12 @@ const SavedViews: React.FC<SavedViewsProps> = ({
       loadViews();
       setError(null);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save view');
+      const status = err.response?.status;
+      if (status === 404 || status === 500) {
+        setError('Saved views feature is not available yet. Backend API needs to be implemented.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to save view');
+      }
     }
   };
 
@@ -94,7 +108,12 @@ const SavedViews: React.FC<SavedViewsProps> = ({
         loadViews();
         setError(null);
       } catch (err: any) {
-        setError('Failed to delete view');
+        const status = err.response?.status;
+        if (status === 404 || status === 500) {
+          setError('Saved views feature is not available yet. Backend API needs to be implemented.');
+        } else {
+          setError('Failed to delete view');
+        }
       }
     }
   };
