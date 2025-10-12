@@ -41,19 +41,8 @@ public class RedisConfig {
         return template;
     }
 
-    @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofHours(1))
-                .disableCachingNullValues()
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
-                        new GenericJackson2JsonRedisSerializer(objectMapper())));
-
-        return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(config)
-                .build();
-    }
+    // Note: cacheManager bean is defined in CacheConfig.java with more sophisticated configuration
+    // including custom TTLs for different cache types (dataSources, extractionConfigs, etc.)
 
     private ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();

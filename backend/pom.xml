@@ -108,6 +108,12 @@
             <artifactId>spring-boot-starter-quartz</artifactId>
         </dependency>
 
+        <!-- Flyway for Database Migrations -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
         <!-- Spring Cloud -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

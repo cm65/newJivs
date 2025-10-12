@@ -20,7 +20,7 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jivs}
     username: ${DATABASE_USERNAME:jivs}
-    password: ${DATABASE_PASSWORD:jivs}
+    password: ${DATABASE_PASSWORD:jivs_password}
     driver-class-name: org.postgresql.Driver
     hikari:
       # P0.5: Increased pool size for high concurrency
@@ -64,11 +64,9 @@ spring:
           in_clause_parameter_padding: true  # NEW: Optimize IN clauses
           plan_cache_max_size: 2048          # NEW: Larger query plan cache
 
-        # Second-level cache (for reference data)
+        # Second-level cache disabled (JCache not available)
         cache:
-          use_second_level_cache: true       # NEW: Enable L2 cache
-          region:
-            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+          use_second_level_cache: false       # Disabled: JCache dependency not included
     open-in-view: false
 
   flyway:
