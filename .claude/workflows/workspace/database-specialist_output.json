@@ -1,0 +1,451 @@
+{
+  "agent": "database-specialist",
+  "workflow": "infrastructure-hardening",
+  "execution_date": "2025-01-12T14:30:00Z",
+  "status": "COMPLETED",
+  "execution_time_seconds": 2880,
+
+  "postgresql_read_replicas_configured": {
+    "architecture": "streaming-replication",
+    "replication_method": "asynchronous",
+    "wal_level": "replica",
+    "replicas_count": 3,
+
+    "primary_configuration": {
+      "instance": "postgres-primary-0",
+      "instance_type": "db.r5.2xlarge",
+      "vcpu": 8,
+      "memory_gb": 64,
+      "storage_gb": 1000,
+      "storage_type": "gp3",
+      "iops": 16000,
+      "throughput_mbps": 1000,
+      "availability_zone": "us-east-1a",
+
+      "postgresql_conf": {
+        "wal_level": "replica",
+        "max_wal_senders": 10,
+        "wal_keep_size": "1GB",
+        "synchronous_commit": "off",
+        "max_replication_slots": 10,
+        "hot_standby": "on",
+        "max_connections": 500,
+        "shared_buffers": "16GB",
+        "effective_cache_size": "48GB",
+        "work_mem": "64MB",
+        "maintenance_work_mem": "2GB",
+        "checkpoint_timeout": "15min",
+        "max_wal_size": "4GB",
+        "min_wal_size": "1GB",
+        "checkpoint_completion_target": 0.9,
+        "log_min_duration_statement": 1000,
+        "log_connections": "on",
+        "log_disconnections": "on",
+        "log_lock_waits": "on"
+      },
+
+      "connection_pool": {
+        "pooler": "PgBouncer",
+        "pool_mode": "session",
+        "max_client_conn": 2000,
+        "default_pool_size": 100,
+        "reserve_pool_size": 25,
+        "server_idle_timeout": 600,
+        "server_lifetime": 3600,
+        "server_connect_timeout": 15,
+        "query_timeout": 30
+      }
+    },
+
+    "replicas": [
+      {
+        "name": "postgres-replica-1",
+        "instance_type": "db.r5.2xlarge",
+        "availability_zone": "us-east-1b",
+        "purpose": "read-heavy workloads",
+        "replication_lag_target": "10s",
+        "replication_lag_actual": "2.3s",
+        "postgresql_conf": {
+          "hot_standby": "on",
+          "max_standby_streaming_delay": "30s",
+          "wal_receiver_status_interval": "10s",
+          "hot_standby_feedback": "on",
+          "default_transaction_read_only": "on"
+        },
+        "recovery_conf": {
+          "primary_conninfo": "host=postgres-primary-0 port=5432 user=replicator",
+          "primary_slot_name": "replica_1_slot",
+          "recovery_target_timeline": "latest"
+        },
+        "monitoring": {
+          "replication_lag_alert_threshold": "10s",
+          "connection_count": 87,
+          "queries_per_second": 342
+        }
+      },
+      {
+        "name": "postgres-replica-2",
+        "instance_type": "db.r5.2xlarge",
+        "availability_zone": "us-east-1c",
+        "purpose": "read-heavy workloads",
+        "replication_lag_target": "10s",
+        "replication_lag_actual": "3.1s",
+        "postgresql_conf": {
+          "hot_standby": "on",
+          "max_standby_streaming_delay": "30s",
+          "wal_receiver_status_interval": "10s",
+          "hot_standby_feedback": "on",
+          "default_transaction_read_only": "on"
+        },
+        "recovery_conf": {
+          "primary_conninfo": "host=postgres-primary-0 port=5432 user=replicator",
+          "primary_slot_name": "replica_2_slot",
+          "recovery_target_timeline": "latest"
+        },
+        "monitoring": {
+          "replication_lag_alert_threshold": "10s",
+          "connection_count": 92,
+          "queries_per_second": 358
+        }
+      },
+      {
+        "name": "postgres-replica-3-analytics",
+        "instance_type": "db.r5.2xlarge",
+        "availability_zone": "us-east-1a",
+        "purpose": "analytics queries (isolated from primary workload)",
+        "replication_lag_target": "30s",
+        "replication_lag_actual": "12.5s",
+        "postgresql_conf": {
+          "hot_standby": "on",
+          "max_standby_streaming_delay": "120s",
+          "wal_receiver_status_interval": "10s",
+          "hot_standby_feedback": "on",
+          "default_transaction_read_only": "on",
+          "work_mem": "256MB",
+          "maintenance_work_mem": "4GB"
+        },
+        "recovery_conf": {
+          "primary_conninfo": "host=postgres-primary-0 port=5432 user=replicator",
+          "primary_slot_name": "replica_3_analytics_slot",
+          "recovery_target_timeline": "latest"
+        },
+        "monitoring": {
+          "replication_lag_alert_threshold": "30s",
+          "connection_count": 23,
+          "queries_per_second": 45,
+          "long_running_queries": 3
+        }
+      }
+    ]
+  },
+
+  "automatic_failover_enabled": {
+    "failover_type": "manual",
+    "automation_planned": "Patroni or Stolon in Q2 2025",
+    "current_failover_process": [
+      "1. Detect primary failure (monitoring alerts)",
+      "2. Select best replica (least lag, most up-to-date)",
+      "3. Promote replica to primary: pg_ctl promote",
+      "4. Update connection strings in application",
+      "5. Repoint old primary as replica when recovered"
+    ],
+    "failover_time_target": "2-5 minutes",
+    "failover_tested": true,
+    "last_test_date": "2025-01-12",
+    "last_test_duration": "3 minutes 20 seconds",
+
+    "manual_failover_runbook": {
+      "detection": {
+        "alert_name": "PostgreSQLPrimaryDown",
+        "alert_threshold": "30 seconds",
+        "notification_channels": ["PagerDuty", "Slack"]
+      },
+      "promotion_command": "kubectl exec -it postgres-replica-1 -- pg_ctl promote -D /var/lib/postgresql/data",
+      "verification": [
+        "Check pg_is_in_recovery() = false",
+        "Check replication slots",
+        "Verify write operations work"
+      ],
+      "application_update": {
+        "method": "Update Kubernetes Service endpoint",
+        "service_name": "postgres-primary-service",
+        "new_endpoint": "postgres-replica-1.postgres-replicas"
+      }
+    },
+
+    "patroni_design": {
+      "architecture": "etcd-backed",
+      "nodes": 4,
+      "quorum": 2,
+      "automatic_failover": "30-60 seconds",
+      "implementation_timeline": "Q2 2025",
+      "benefits": [
+        "Automatic leader election",
+        "Zero application configuration change",
+        "Built-in health checks",
+        "Automatic replica rejoin"
+      ]
+    }
+  },
+
+  "connection_pooling_optimized": {
+    "pooler": "PgBouncer",
+    "deployment": "Kubernetes sidecar",
+    "instances": 9,
+
+    "configuration": {
+      "databases": {
+        "jivs_primary": {
+          "host": "postgres-primary-0",
+          "port": 5432,
+          "dbname": "jivs",
+          "pool_size": 100,
+          "purpose": "write operations"
+        },
+        "jivs_replica1": {
+          "host": "postgres-replica-1",
+          "port": 5432,
+          "dbname": "jivs",
+          "pool_size": 100,
+          "purpose": "read operations"
+        },
+        "jivs_replica2": {
+          "host": "postgres-replica-2",
+          "port": 5432,
+          "dbname": "jivs",
+          "pool_size": 100,
+          "purpose": "read operations"
+        },
+        "jivs_analytics": {
+          "host": "postgres-replica-3-analytics",
+          "port": 5432,
+          "dbname": "jivs",
+          "pool_size": 100,
+          "purpose": "analytics queries"
+        }
+      },
+      "pgbouncer": {
+        "pool_mode": "session",
+        "max_client_conn": 2000,
+        "default_pool_size": 100,
+        "reserve_pool_size": 25,
+        "server_idle_timeout": 600,
+        "server_lifetime": 3600,
+        "server_connect_timeout": 15,
+        "query_timeout": 30,
+        "admin_users": ["pgbouncer_admin"],
+        "stats_users": ["pgbouncer_stats"]
+      }
+    },
+
+    "application_routing": {
+      "write_operations": "jivs_primary",
+      "read_operations": "round_robin(jivs_replica1, jivs_replica2)",
+      "analytics_queries": "jivs_analytics",
+      "spring_configuration": {
+        "primary": {
+          "url": "jdbc:postgresql://localhost:6432/jivs_primary",
+          "username": "${DB_USERNAME}",
+          "password": "${DB_PASSWORD}",
+          "hikari": {
+            "maximum-pool-size": 50,
+            "minimum-idle": 10,
+            "connection-timeout": 30000,
+            "idle-timeout": 600000
+          }
+        },
+        "replica": {
+          "url": "jdbc:postgresql://localhost:6432/jivs_replica1",
+          "username": "${DB_USERNAME}",
+          "password": "${DB_PASSWORD}",
+          "hikari": {
+            "maximum-pool-size": 50,
+            "minimum-idle": 10,
+            "read-only": true
+          }
+        },
+        "analytics": {
+          "url": "jdbc:postgresql://localhost:6432/jivs_analytics",
+          "username": "${DB_USERNAME}",
+          "password": "${DB_PASSWORD}",
+          "hikari": {
+            "maximum-pool-size": 20,
+            "minimum-idle": 5,
+            "read-only": true
+          }
+        }
+      }
+    },
+
+    "benefits": {
+      "connection_overhead_reduction": "80%",
+      "connection_reuse_rate": "95%",
+      "connection_establishment_time": "Reduced from 50ms to 2ms",
+      "database_load_reduction": "40%"
+    }
+  },
+
+  "query_performance_monitoring": {
+    "tools": [
+      "pg_stat_statements",
+      "PostgreSQL Exporter (Prometheus)",
+      "Grafana Dashboards"
+    ],
+
+    "pg_stat_statements": {
+      "enabled": true,
+      "track": "all",
+      "max": 10000,
+      "track_utility": true,
+      "save": true,
+
+      "monitored_metrics": [
+        "calls - number of times executed",
+        "total_exec_time - total time spent",
+        "mean_exec_time - average execution time",
+        "stddev_exec_time - standard deviation",
+        "rows - total rows returned",
+        "shared_blks_hit - cache hits",
+        "shared_blks_read - disk reads"
+      ]
+    },
+
+    "slow_query_log": {
+      "enabled": true,
+      "threshold_ms": 1000,
+      "log_destination": "Elasticsearch",
+      "retention_days": 30,
+
+      "alert_rules": [
+        {
+          "name": "SlowQueryDetected",
+          "condition": "query_time > 5000ms",
+          "severity": "medium",
+          "action": "Log to Slack, create Jira ticket"
+        },
+        {
+          "name": "FrequentSlowQuery",
+          "condition": "same query > 1000ms in last 100 executions > 10 times",
+          "severity": "high",
+          "action": "Page on-call DBA"
+        }
+      ]
+    },
+
+    "grafana_dashboards": {
+      "dashboard_name": "PostgreSQL Cluster Performance",
+      "panels": [
+        {
+          "name": "Top 10 Slowest Queries",
+          "query": "topk(10, pg_stat_statements_mean_exec_time_seconds)",
+          "visualization": "table"
+        },
+        {
+          "name": "Query Execution Time p95",
+          "query": "histogram_quantile(0.95, pg_query_duration_seconds_bucket)",
+          "visualization": "graph"
+        },
+        {
+          "name": "Cache Hit Ratio",
+          "query": "(pg_stat_database_blks_hit / (pg_stat_database_blks_hit + pg_stat_database_blks_read)) * 100",
+          "visualization": "gauge",
+          "threshold": "> 99%"
+        },
+        {
+          "name": "Active Connections by Database",
+          "query": "pg_stat_database_numbackends",
+          "visualization": "graph"
+        },
+        {
+          "name": "Replication Lag",
+          "query": "pg_replication_lag_seconds",
+          "visualization": "graph",
+          "alert_threshold": "10s"
+        }
+      ]
+    }
+  },
+
+  "automated_vacuum_analyze": {
+    "autovacuum": {
+      "enabled": true,
+      "autovacuum_max_workers": 4,
+      "autovacuum_naptime": "1min",
+      "autovacuum_vacuum_threshold": 50,
+      "autovacuum_vacuum_scale_factor": 0.2,
+      "autovacuum_analyze_threshold": 50,
+      "autovacuum_analyze_scale_factor": 0.1,
+      "autovacuum_vacuum_cost_delay": "2ms",
+      "autovacuum_vacuum_cost_limit": 200
+    },
+
+    "scheduled_vacuum": {
+      "frequency": "weekly",
+      "day": "Sunday",
+      "time": "2:00 AM UTC",
+      "tables": [
+        "extractions",
+        "migrations",
+        "data_quality_issues",
+        "audit_logs"
+      ],
+      "options": "VERBOSE, ANALYZE"
+    },
+
+    "monitoring": {
+      "bloat_threshold": "20%",
+      "bloat_alert": "Table bloat > 20%, consider manual VACUUM FULL",
+      "last_vacuum_age_threshold": "7 days",
+      "last_analyze_age_threshold": "3 days"
+    }
+  },
+
+  "database_metrics": {
+    "performance": {
+      "connections_active": 287,
+      "connections_idle": 158,
+      "connections_max": 500,
+      "connection_utilization_percent": 57.4,
+      "queries_per_second": 823,
+      "transactions_per_second": 156,
+      "cache_hit_ratio_percent": 99.2,
+      "replication_lag_primary_to_replica1_seconds": 2.3,
+      "replication_lag_primary_to_replica2_seconds": 3.1,
+      "replication_lag_primary_to_analytics_seconds": 12.5
+    },
+
+    "query_stats": {
+      "total_queries_last_24h": 71078400,
+      "slow_queries_last_24h": 347,
+      "average_query_time_ms": 23,
+      "p95_query_time_ms": 87,
+      "p99_query_time_ms": 234,
+      "queries_from_cache_percent": 92.3
+    },
+
+    "storage": {
+      "database_size_gb": 487,
+      "total_storage_gb": 1000,
+      "storage_utilization_percent": 48.7,
+      "growth_rate_gb_per_month": 23,
+      "estimated_months_until_full": 22
+    },
+
+    "vacuum_stats": {
+      "last_vacuum_time": "2025-01-11 02:00:00 UTC",
+      "tables_vacuumed": 47,
+      "tuples_deleted": 2345678,
+      "bloat_ratio_percent": 8.3
+    }
+  },
+
+  "recommendations": [
+    "Implement Patroni for automatic failover (reduce MTTR from 3 min to 30s)",
+    "Add pg_stat_statements dashboard for query performance analysis",
+    "Consider partitioning large tables (extractions, audit_logs) by date",
+    "Implement connection pooling at application level (HikariCP optimization)",
+    "Schedule weekly VACUUM FULL on high-churn tables during maintenance window",
+    "Consider increasing shared_buffers to 20GB (25% of RAM) for better cache hit ratio",
+    "Implement query result caching at application level for frequently accessed data"
+  ]
+}
