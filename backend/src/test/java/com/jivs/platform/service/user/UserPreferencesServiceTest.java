@@ -103,7 +103,8 @@ class UserPreferencesServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(newTheme, result.getTheme());
-        verify(repository, times(1)).save(any(UserPreferences.class));
+        // Called twice: once in createDefaultPreferences(), once in updateTheme()
+        verify(repository, times(2)).save(any(UserPreferences.class));
     }
 
     @Test
