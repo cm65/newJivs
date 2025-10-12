@@ -119,18 +119,8 @@ public class ExtractionService {
                 throw new BusinessException("Failed to connect to data source");
             }
 
-            // Execute extraction with progress callback
-            ExtractionResult result = connector.extract(job.getExtractionParams(), (recordsProcessed, totalRecords) -> {
-                // Calculate progress percentage
-                int progress = totalRecords > 0 ? (int) ((recordsProcessed * 100) / totalRecords) : 0;
-
-                // Update job progress in database
-                job.setRecordsExtracted(recordsProcessed);
-                extractionJobRepository.save(job);
-
-                // Publish progress update (throttled to every 1 second by connector)
-                eventPublisher.publishProgressUpdate(jobId, progress, recordsProcessed, totalRecords);
-            });
+            // Execute extraction
+            ExtractionResult result = connector.extract(job.getExtractionParams());
 
             // Update job with results
             job.setStatus(ExtractionJob.JobStatus.COMPLETED);

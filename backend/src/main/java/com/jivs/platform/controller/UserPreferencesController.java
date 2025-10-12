@@ -2,8 +2,8 @@ package com.jivs.platform.controller;
 
 import com.jivs.platform.domain.UserPreferences;
 import com.jivs.platform.dto.UserPreferencesDTO;
-import com.jivs.platform.security.JwtTokenProvider;
-import com.jivs.platform.service.UserPreferencesService;
+import com.jivs.platform.security.UserPrincipal;
+import com.jivs.platform.service.user.UserPreferencesService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,10 +11,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 /**
  * REST controller for user preferences management
@@ -29,18 +30,16 @@ import javax.validation.Valid;
 public class UserPreferencesController {
 
     private final UserPreferencesService preferencesService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * Get user's theme preference
-     * @param request HTTP request to extract user ID from JWT
      * @return User preferences with theme setting
      */
     @GetMapping("/theme")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get theme preference", description = "Get user's theme preference (light/dark)")
-    public ResponseEntity<UserPreferencesDTO> getThemePreference(HttpServletRequest request) {
-        Long userId = getUserIdFromRequest(request);
+    public ResponseEntity<UserPreferencesDTO> getThemePreference() {
+        Long userId = getCurrentUserId();
         log.debug("Getting theme preference for user: {}", userId);
 
         UserPreferences preferences = preferencesService.getUserPreferences(userId);
@@ -52,7 +51,6 @@ public class UserPreferencesController {
 
     /**
      * Update user's theme preference
-     * @param request HTTP request to extract user ID from JWT
      * @param dto Theme preference DTO
      * @return Updated preferences
      */
@@ -60,9 +58,8 @@ public class UserPreferencesController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update theme preference", description = "Update user's theme preference (light/dark)")
     public ResponseEntity<UserPreferencesDTO> updateThemePreference(
-            HttpServletRequest request,
             @Valid @RequestBody UserPreferencesDTO dto) {
-        Long userId = getUserIdFromRequest(request);
+        Long userId = getCurrentUserId();
         log.info("Updating theme preference for user {} to: {}", userId, dto.getTheme());
 
         UserPreferences preferences = preferencesService.updateTheme(userId, dto.getTheme());
@@ -74,14 +71,13 @@ public class UserPreferencesController {
 
     /**
      * Get all user preferences
-     * @param request HTTP request to extract user ID from JWT
      * @return All user preferences
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get all preferences", description = "Get all user preferences")
-    public ResponseEntity<UserPreferencesDTO> getAllPreferences(HttpServletRequest request) {
-        Long userId = getUserIdFromRequest(request);
+    public ResponseEntity<UserPreferencesDTO> getAllPreferences() {
+        Long userId = getCurrentUserId();
         log.debug("Getting all preferences for user: {}", userId);
 
         UserPreferences preferences = preferencesService.getUserPreferences(userId);
@@ -92,7 +88,6 @@ public class UserPreferencesController {
 
     /**
      * Update user preferences
-     * @param request HTTP request to extract user ID from JWT
      * @param dto Preferences DTO
      * @return Updated preferences
      */
@@ -100,9 +95,8 @@ public class UserPreferencesController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update preferences", description = "Update user preferences")
     public ResponseEntity<UserPreferencesDTO> updatePreferences(
-            HttpServletRequest request,
             @Valid @RequestBody UserPreferencesDTO dto) {
-        Long userId = getUserIdFromRequest(request);
+        Long userId = getCurrentUserId();
         log.info("Updating preferences for user: {}", userId);
 
         UserPreferences preferences = preferencesService.updatePreferences(userId, dto);
@@ -112,11 +106,12 @@ public class UserPreferencesController {
     }
 
     /**
-     * Extract user ID from JWT token in request
+     * Get current authenticated user's ID from security context
      */
-    private Long getUserIdFromRequest(HttpServletRequest request) {
-        String token = jwtTokenProvider.resolveToken(request);
-        return jwtTokenProvider.getUserIdFromToken(token);
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return userPrincipal.getId();
     }
 
     /**
