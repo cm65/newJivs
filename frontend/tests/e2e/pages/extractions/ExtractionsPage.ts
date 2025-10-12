@@ -27,6 +27,11 @@ export class ExtractionsPage {
   readonly loadingSpinner: Locator;
   readonly errorAlert: Locator;
   readonly successAlert: Locator;
+  readonly selectAllCheckbox: Locator;
+  readonly bulkOperationsToolbar: Locator;
+  readonly bulkStartButton: Locator;
+  readonly bulkStopButton: Locator;
+  readonly bulkDeleteButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -51,6 +56,11 @@ export class ExtractionsPage {
     this.loadingSpinner = page.locator('[role="progressbar"]');
     this.errorAlert = page.locator('[role="alert"][class*="error"]');
     this.successAlert = page.locator('[role="alert"][class*="success"]');
+    this.selectAllCheckbox = page.locator('table thead tr th[padding="checkbox"] input[type="checkbox"]');
+    this.bulkOperationsToolbar = page.locator('[class*="MuiPaper"]:has-text("selected")');
+    this.bulkStartButton = this.bulkOperationsToolbar.locator('button:has-text("Start")');
+    this.bulkStopButton = this.bulkOperationsToolbar.locator('button:has-text("Stop")');
+    this.bulkDeleteButton = this.bulkOperationsToolbar.locator('button:has-text("Delete")');
   }
 
   /**
@@ -276,5 +286,93 @@ export class ExtractionsPage {
     await expect(this.newExtractionButton).toBeVisible();
     await expect(this.extractionsTable).toBeVisible();
     await expect(this.pagination).toBeVisible();
+  }
+
+  /**
+   * Select all extractions
+   */
+  async selectAll(): Promise<void> {
+    await this.selectAllCheckbox.click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Select extraction by name
+   */
+  async selectExtraction(name: string): Promise<void> {
+    const row = await this.findExtractionByName(name);
+    if (!row) {
+      throw new Error(`Extraction "${name}" not found in table`);
+    }
+    const checkbox = row.locator('input[type="checkbox"]');
+    await checkbox.click();
+    await this.page.waitForTimeout(500);
+  }
+
+  /**
+   * Get count of selected extractions
+   */
+  async getSelectedCount(): Promise<number> {
+    const toolbar = this.bulkOperationsToolbar;
+    if (await toolbar.isVisible()) {
+      const text = await toolbar.textContent();
+      const match = text?.match(/(\d+)\s+selected/);
+      return match ? parseInt(match[1]) : 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Check if bulk operations toolbar is visible
+   */
+  async isBulkToolbarVisible(): Promise<boolean> {
+    return await this.bulkOperationsToolbar.isVisible();
+  }
+
+  /**
+   * Click bulk start button
+   */
+  async clickBulkStart(): Promise<void> {
+    await this.bulkStartButton.click();
+    await this.page.waitForTimeout(1000);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Click bulk stop button
+   */
+  async clickBulkStop(): Promise<void> {
+    await this.bulkStopButton.click();
+    // Handle confirmation dialog
+    const confirmButton = this.page.locator('button:has-text("Confirm"), button:has-text("Stop")').last();
+    if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await confirmButton.click();
+    }
+    await this.page.waitForTimeout(1000);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Click bulk delete button
+   */
+  async clickBulkDelete(): Promise<void> {
+    await this.bulkDeleteButton.click();
+    // Handle confirmation dialog
+    const confirmButton = this.page.locator('button:has-text("Confirm"), button:has-text("Delete")').last();
+    await confirmButton.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmButton.click();
+    await this.page.waitForTimeout(1000);
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Clear selection
+   */
+  async clearSelection(): Promise<void> {
+    const clearButton = this.bulkOperationsToolbar.locator('button:has-text("Clear")');
+    if (await clearButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await clearButton.click();
+      await this.page.waitForTimeout(500);
+    }
   }
 }
