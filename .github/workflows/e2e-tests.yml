@@ -1,0 +1,182 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: E2E Tests (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_DB=jivs \
+            -e POSTGRES_USER=jivs_user \
+            -e POSTGRES_PASSWORD=jivs_password \
+            -p 5432:5432 \
+            postgres:15
+
+      - name: Wait for PostgreSQL
+        run: |
+          timeout 60 sh -c 'until docker exec postgres pg_isready -U jivs_user -d jivs; do sleep 1; done'
+
+      - name: Build backend
+        run: |
+          cd backend
+          mvn clean package -DskipTests
+
+      - name: Start backend
+        run: |
+          cd backend
+          nohup java -jar target/jivs-platform-1.0.0.jar > backend.log 2>&1 &
+          echo $! > backend.pid
+
+      - name: Wait for backend
+        run: |
+          timeout 120 sh -c 'until curl -s http://localhost:8080/actuator/health | grep UP; do sleep 2; done'
+
+      - name: Start frontend
+        run: |
+          cd frontend
+          nohup npm run dev > frontend.log 2>&1 &
+          echo $! > frontend.pid
+
+      - name: Wait for frontend
+        run: |
+          timeout 60 sh -c 'until curl -s http://localhost:3001; do sleep 2; done'
+
+      - name: Run E2E tests
+        run: |
+          cd frontend
+          npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results-${{ matrix.shardIndex }}
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload backend logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-logs-${{ matrix.shardIndex }}
+          path: backend/backend.log
+          retention-days: 7
+
+      - name: Upload frontend logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-logs-${{ matrix.shardIndex }}
+          path: frontend/frontend.log
+          retention-days: 7
+
+      - name: Stop services
+        if: always()
+        run: |
+          if [ -f backend/backend.pid ]; then
+            kill $(cat backend/backend.pid) || true
+          fi
+          if [ -f frontend/frontend.pid ]; then
+            kill $(cat frontend/frontend.pid) || true
+          fi
+          docker stop postgres || true
+          docker rm postgres || true
+
+  report:
+    name: Publish Test Report
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: Merge test results
+        run: |
+          mkdir -p merged-results
+          find all-results -name "*.xml" -exec cp {} merged-results/ \;
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: merged-results/**/*.xml
+          check_name: E2E Test Results
+          comment_mode: always
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const resultsPath = 'merged-results';
+
+            // Read test results and create comment
+            let comment = '## 🧪 E2E Test Results\n\n';
+            comment += '| Shard | Status |\n';
+            comment += '|-------|--------|\n';
+
+            for (let i = 1; i <= 4; i++) {
+              const artifactName = `playwright-results-${i}`;
+              const exists = fs.existsSync(`all-results/${artifactName}`);
+              comment += `| Shard ${i}/4 | ${exists ? '✅ Complete' : '❌ Failed'} |\n`;
+            }
+
+            comment += '\n📊 **Full report available in workflow artifacts**\n';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

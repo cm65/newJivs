@@ -11,6 +11,14 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:codegen": "playwright codegen http://localhost:3001",
+    "test:e2e:auth": "playwright test tests/e2e/specs/auth",
+    "test:e2e:critical": "playwright test tests/e2e/specs/auth tests/e2e/specs/dashboard",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,scss,md}\"",
     "type-check": "tsc --noEmit"
   },
@@ -43,6 +51,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@testing-library/jest-dom": "^6.1.5",
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",

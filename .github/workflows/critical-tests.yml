@@ -1,0 +1,92 @@
+name: Critical Path Tests
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  critical-tests:
+    name: Critical Path E2E Tests
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install Playwright
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+
+      - name: Start PostgreSQL
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_DB=jivs \
+            -e POSTGRES_USER=jivs_user \
+            -e POSTGRES_PASSWORD=jivs_password \
+            -p 5432:5432 \
+            postgres:15
+          sleep 10
+
+      - name: Build and start backend
+        run: |
+          cd backend
+          mvn clean package -DskipTests
+          nohup java -jar target/jivs-platform-1.0.0.jar &
+          sleep 30
+
+      - name: Start frontend
+        run: |
+          cd frontend
+          nohup npm run dev &
+          sleep 10
+
+      - name: Run critical tests
+        run: |
+          cd frontend
+          npm run test:e2e:critical
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: critical-test-results
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7
+
+      - name: Comment on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **Critical path tests failed!**\n\nPlease check the test results and fix the issues before merging.\n\n[View test results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+            });
