@@ -1,15 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { CssBaseline } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import { Provider } from 'react-redux';
 
 import 'react-toastify/dist/ReactToastify.css';
 
 import { store } from './store';
-import { theme } from './styles/theme';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeModeProvider } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -39,9 +39,9 @@ function App() {
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <AuthProvider>
+        <AuthProvider>
+          <ThemeModeProvider>
+            <CssBaseline />
             <Router>
               <Routes>
                 {/* Auth Routes */}
@@ -83,8 +83,8 @@ function App() {
               draggable
               pauseOnHover
             />
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeModeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </Provider>
   );

@@ -6,6 +6,7 @@ import com.jivs.platform.common.exception.ResourceNotFoundException;
 import com.jivs.platform.common.util.StringUtil;
 import com.jivs.platform.domain.extraction.DataSource;
 import com.jivs.platform.domain.extraction.ExtractionJob;
+import com.jivs.platform.event.ExtractionEventPublisher;
 import com.jivs.platform.repository.DataSourceRepository;
 import com.jivs.platform.repository.ExtractionJobRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Service for data extraction operations
+ * Service for data extraction operations with WebSocket real-time updates
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class ExtractionService {
     private final DataSourceRepository dataSourceRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ConnectorFactory connectorFactory;
+    private final ExtractionEventPublisher eventPublisher;
 
     /**
      * Create a new extraction job
@@ -66,6 +68,9 @@ public class ExtractionService {
         ExtractionJob savedJob = extractionJobRepository.save(job);
         log.info("Extraction job created: {}", savedJob.getJobId());
 
+        // Publish status changed event
+        eventPublisher.publishStatusChanged(savedJob.getJobId(), "PENDING", "Extraction job created");
+
         // Queue job for processing
         queueExtractionJob(savedJob);
 
@@ -86,7 +91,7 @@ public class ExtractionService {
     }
 
     /**
-     * Execute extraction job asynchronously
+     * Execute extraction job asynchronously with real-time progress updates
      */
     @Async
     @Transactional
@@ -103,6 +108,9 @@ public class ExtractionService {
             job.setStartTime(LocalDateTime.now());
             extractionJobRepository.save(job);
 
+            // Publish started event
+            eventPublisher.publishStarted(jobId);
+
             // Get appropriate connector
             DataConnector connector = connectorFactory.getConnector(job.getDataSource());
 
@@ -111,8 +119,18 @@ public class ExtractionService {
                 throw new BusinessException("Failed to connect to data source");
             }
 
-            // Execute extraction
-            ExtractionResult result = connector.extract(job.getExtractionParams());
+            // Execute extraction with progress callback
+            ExtractionResult result = connector.extract(job.getExtractionParams(), (recordsProcessed, totalRecords) -> {
+                // Calculate progress percentage
+                int progress = totalRecords > 0 ? (int) ((recordsProcessed * 100) / totalRecords) : 0;
+
+                // Update job progress in database
+                job.setRecordsExtracted(recordsProcessed);
+                extractionJobRepository.save(job);
+
+                // Publish progress update (throttled to every 1 second by connector)
+                eventPublisher.publishProgressUpdate(jobId, progress, recordsProcessed, totalRecords);
+            });
 
             // Update job with results
             job.setStatus(ExtractionJob.JobStatus.COMPLETED);
@@ -124,12 +142,18 @@ public class ExtractionService {
             log.info("Extraction job completed successfully: {} - Records: {}",
                     jobId, result.getRecordsExtracted());
 
+            // Publish completed event
+            eventPublisher.publishCompleted(jobId, result.getRecordsExtracted());
+
         } catch (Exception e) {
             log.error("Extraction job failed: {}", jobId, e);
             job.setStatus(ExtractionJob.JobStatus.FAILED);
             job.setEndTime(LocalDateTime.now());
             job.setErrorMessage(e.getMessage());
             job.setErrorStackTrace(getStackTraceString(e));
+
+            // Publish failed event
+            eventPublisher.publishFailed(jobId, e.getMessage());
         }
 
         ExtractionJob updatedJob = extractionJobRepository.save(job);
@@ -188,6 +212,9 @@ public class ExtractionService {
 
         ExtractionJob updatedJob = extractionJobRepository.save(job);
         log.info("Extraction job cancelled: {}", jobId);
+
+        // Publish cancelled event
+        eventPublisher.publishCancelled(jobId);
 
         return updatedJob;
     }

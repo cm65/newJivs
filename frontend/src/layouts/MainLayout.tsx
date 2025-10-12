@@ -44,6 +44,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { visuallyHidden } from '../styles/theme';
 import QuickActions from '../components/QuickActions';
+import ThemeToggle from '../components/ThemeToggle';
 
 const drawerWidth = 240;
 
@@ -242,7 +243,10 @@ const MainLayout: React.FC = () => {
             {breadcrumbNameMap[location.pathname] || 'JiVS Platform'}
           </Typography>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Theme Toggle */}
+            <ThemeToggle color="inherit" />
+
             {/* Notifications */}
             <Tooltip title="Notifications">
               <IconButton onClick={handleNotificationOpen} color="inherit">
