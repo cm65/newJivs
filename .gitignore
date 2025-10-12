@@ -37,3 +37,4 @@ logs/
 
 # Dependencies
 node_modules/
+backend.pid
