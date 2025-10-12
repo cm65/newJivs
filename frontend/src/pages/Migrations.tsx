@@ -69,16 +69,23 @@ const Migrations: React.FC = () => {
   // WebSocket connection and subscription for real-time updates
   useEffect(() => {
     let subscriptionKey: string | null = null;
+    let mounted = true;
 
     const connectAndSubscribe = async () => {
       try {
+        if (!mounted) return; // Guard against unmount during async
+
         // Connect to WebSocket if not already connected
         if (!websocketService.isConnected()) {
           await websocketService.connect();
         }
 
+        if (!mounted) return; // Check again after async operation
+
         // Subscribe to all migration updates
         subscriptionKey = websocketService.subscribeToAllMigrations((update) => {
+          if (!mounted) return; // Ignore updates after unmount
+
           console.log('Received migration update:', update);
 
           // Update the migration in the list
@@ -106,6 +113,7 @@ const Migrations: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
+      mounted = false; // Prevent state updates after unmount
       if (subscriptionKey) {
         websocketService.unsubscribe(subscriptionKey);
       }

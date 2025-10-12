@@ -151,16 +151,23 @@ const Extractions: React.FC = () => {
   // WebSocket connection and subscription for real-time updates
   useEffect(() => {
     let subscriptionKey: string | null = null;
+    let mounted = true;
 
     const connectAndSubscribe = async () => {
       try {
+        if (!mounted) return; // Guard against unmount during async
+
         // Connect to WebSocket if not already connected
         if (!websocketService.isConnected()) {
           await websocketService.connect();
         }
 
+        if (!mounted) return; // Check again after async operation
+
         // Subscribe to all extraction updates
         subscriptionKey = websocketService.subscribeToAllExtractions((update) => {
+          if (!mounted) return; // Ignore updates after unmount
+
           console.log('Received extraction update:', update);
 
           // Update the extraction in the list
@@ -186,6 +193,7 @@ const Extractions: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
+      mounted = false; // Prevent state updates after unmount
       if (subscriptionKey) {
         websocketService.unsubscribe(subscriptionKey);
       }
