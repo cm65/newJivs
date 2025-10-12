@@ -1,0 +1,34 @@
+spring:
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled: true
+    clean-disabled: true
+
+logging:
+  level:
+    root: WARN
+    com.jivs.platform: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+jivs:
+  storage:
+    provider: ${STORAGE_PROVIDER:s3}
+
+  document:
+    ocr-enabled: true
+
+  monitoring:
+    metrics-enabled: true

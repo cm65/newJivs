@@ -1,0 +1,209 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: jivs-platform
+data:
+  backup-all.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Starting full backup at $(date)"
+
+    # PostgreSQL backup
+    echo "Backing up PostgreSQL..."
+    /scripts/backup-postgres.sh || echo "PostgreSQL backup failed"
+
+    # Redis backup
+    echo "Backing up Redis..."
+    /scripts/backup-redis.sh || echo "Redis backup failed"
+
+    echo "Full backup completed at $(date)"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jivs-backup-postgres
+  namespace: jivs-platform
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: postgres-backup
+              image: postgres:15-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  #!/bin/sh
+                  set -e
+
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  BACKUP_FILE="postgres-backup-${TIMESTAMP}.sql.gz"
+
+                  echo "Starting PostgreSQL backup..."
+
+                  PGPASSWORD="$DATABASE_PASSWORD" pg_dump \
+                    -h postgres-service \
+                    -U $DATABASE_USERNAME \
+                    -d jivs \
+                    --format=plain \
+                    --no-owner \
+                    --no-acl | gzip > /backups/$BACKUP_FILE
+
+                  echo "Backup created: $BACKUP_FILE"
+                  ls -lh /backups/$BACKUP_FILE
+
+                  # Upload to S3 if AWS CLI is available
+                  if command -v aws > /dev/null; then
+                    echo "Uploading to S3..."
+                    aws s3 cp /backups/$BACKUP_FILE \
+                      s3://$S3_BUCKET/postgres/$BACKUP_FILE \
+                      --storage-class STANDARD_IA \
+                      --server-side-encryption AES256
+                    echo "Upload completed"
+                  fi
+
+                  echo "Backup process completed successfully"
+              env:
+                - name: DATABASE_USERNAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: jivs-backend-config
+                      key: DATABASE_USERNAME
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: DATABASE_PASSWORD
+                - name: S3_BUCKET
+                  value: "jivs-backups"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: AWS_ACCESS_KEY
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: AWS_SECRET_KEY
+                - name: AWS_DEFAULT_REGION
+                  value: "us-east-1"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backups
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: backup-storage
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jivs-backup-redis
+  namespace: jivs-platform
+spec:
+  schedule: "30 2 * * *"  # Daily at 2:30 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: redis-backup
+              image: redis:7-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  #!/bin/sh
+                  set -e
+
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  BACKUP_FILE="redis-backup-${TIMESTAMP}.rdb.gz"
+
+                  echo "Starting Redis backup..."
+
+                  # Trigger BGSAVE
+                  redis-cli -h redis-service -a "$REDIS_PASSWORD" BGSAVE
+
+                  # Wait for BGSAVE to complete
+                  echo "Waiting for BGSAVE to complete..."
+                  sleep 10
+
+                  # Get RDB file
+                  redis-cli -h redis-service -a "$REDIS_PASSWORD" \
+                    --rdb /backups/dump.rdb
+
+                  # Compress
+                  gzip /backups/dump.rdb
+                  mv /backups/dump.rdb.gz /backups/$BACKUP_FILE
+
+                  echo "Backup created: $BACKUP_FILE"
+                  ls -lh /backups/$BACKUP_FILE
+
+                  # Upload to S3
+                  if command -v aws > /dev/null; then
+                    echo "Uploading to S3..."
+                    aws s3 cp /backups/$BACKUP_FILE \
+                      s3://$S3_BUCKET/redis/$BACKUP_FILE \
+                      --storage-class STANDARD_IA \
+                      --server-side-encryption AES256
+                    echo "Upload completed"
+                  fi
+
+                  echo "Backup process completed successfully"
+              env:
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: REDIS_PASSWORD
+                - name: S3_BUCKET
+                  value: "jivs-backups"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: AWS_ACCESS_KEY
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: jivs-backend-secrets
+                      key: AWS_SECRET_KEY
+                - name: AWS_DEFAULT_REGION
+                  value: "us-east-1"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backups
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: backup-storage
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-storage
+  namespace: jivs-platform
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: "standard"
+  resources:
+    requests:
+      storage: 200Gi

@@ -1,0 +1,277 @@
+spring:
+  application:
+    name: jivs-platform
+
+  profiles:
+    active: ${SPRING_PROFILE:dev}
+
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+
+  autoconfigure:
+    exclude:
+      - org.camunda.bpm.spring.boot.starter.CamundaBpmAutoConfiguration
+      - org.camunda.bpm.spring.boot.starter.rest.CamundaBpmRestAutoConfiguration
+      - org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jivs}
+    username: ${DATABASE_USERNAME:jivs}
+    password: ${DATABASE_PASSWORD:jivs}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9201}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    connection-timeout: 3s
+    socket-timeout: 5s
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:jivs}
+    password: ${RABBITMQ_PASSWORD:jivs_password}
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: auto
+        concurrency: 5
+        max-concurrency: 10
+        prefetch: 10
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          max-interval: 10000
+          multiplier: 2
+
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000 # 1 hour
+      cache-null-values: false
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+    session:
+      timeout: 30m
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+
+# Management Endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+    rabbit:
+      enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.jivs: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/jivs-platform.log
+    max-size: 10MB
+    max-history: 30
+
+# OpenAPI/Swagger Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    disable-swagger-default-url: true
+  show-actuator: true
+
+# Application Specific Configuration
+jivs:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:change-this-secret-key-in-production-minimum-256-bits}
+      expiration: 86400000 # 24 hours
+      refresh-expiration: 604800000 # 7 days
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:5173}
+      allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600
+
+  encryption:
+    algorithm: AES/GCM/NoPadding
+    key: ${ENCRYPTION_KEY:change-this-encryption-key-in-production}
+    key-size: 256
+
+  storage:
+    provider: ${STORAGE_PROVIDER:local} # local, s3, azure, gcp
+    local:
+      base-path: ${STORAGE_LOCAL_PATH:/var/jivs/storage}
+    s3:
+      bucket: ${AWS_S3_BUCKET:}
+      region: ${AWS_REGION:us-east-1}
+      access-key: ${AWS_ACCESS_KEY:}
+      secret-key: ${AWS_SECRET_KEY:}
+    azure:
+      account-name: ${AZURE_STORAGE_ACCOUNT:}
+      account-key: ${AZURE_STORAGE_KEY:}
+      container: ${AZURE_CONTAINER:jivs}
+    gcp:
+      project-id: ${GCP_PROJECT_ID:}
+      bucket: ${GCP_BUCKET:}
+      credentials-path: ${GCP_CREDENTIALS_PATH:}
+
+  extraction:
+    max-parallel-jobs: 5
+    batch-size: 10000
+    temp-directory: /tmp/jivs/extraction
+
+  migration:
+    max-parallel-jobs: 3
+    checkpoint-interval: 1000
+
+  retention:
+    scan-interval: 86400000 # 24 hours
+    batch-size: 1000
+
+  data-quality:
+    duplicate-threshold: 0.95
+    validation-rules-path: /etc/jivs/validation-rules
+
+  compliance:
+    gdpr:
+      enabled: true
+      default-retention-days: 2555 # 7 years
+    ccpa:
+      enabled: true
+
+  audit:
+    enabled: true
+    retention-days: 2555 # 7 years
+
+  monitoring:
+    metrics-enabled: true
+    health-check-interval: 60000
+
+  document:
+    supported-formats: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,xml,json
+    max-file-size: 104857600 # 100MB
+    ocr-enabled: false
+
+# Camunda Configuration
+camunda:
+  bpm:
+    admin-user:
+      id: admin
+      password: ${CAMUNDA_ADMIN_PASSWORD:admin}
+      firstName: Admin
+      lastName: User
+    filter:
+      create: All tasks
+    authorization:
+      enabled: true
+
+# Quartz Scheduler Configuration
+spring.quartz:
+  job-store-type: jdbc
+  jdbc:
+    initialize-schema: always
+  properties:
+    org:
+      quartz:
+        scheduler:
+          instanceId: AUTO
+        jobStore:
+          class: org.quartz.impl.jdbcjobstore.JobStoreTX
+          driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+          tablePrefix: QRTZ_
+          isClustered: true
+        threadPool:
+          threadCount: 10

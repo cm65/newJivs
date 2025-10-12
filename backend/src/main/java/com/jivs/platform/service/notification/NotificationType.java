@@ -1,0 +1,21 @@
+package com.jivs.platform.service.notification;
+
+/**
+ * Notification types
+ */
+public enum NotificationType {
+    EXTRACTION_COMPLETE,
+    EXTRACTION_FAILED,
+    MIGRATION_COMPLETE,
+    MIGRATION_FAILED,
+    DATA_QUALITY_ALERT,
+    RETENTION_ACTION_DUE,
+    COMPLIANCE_REQUEST,
+    SYSTEM_ALERT,
+    USER_MENTION,
+    DOCUMENT_SHARED,
+    APPROVAL_REQUIRED,
+    APPROVAL_GRANTED,
+    APPROVAL_DENIED,
+    SCHEDULED_JOB_FAILED
+}

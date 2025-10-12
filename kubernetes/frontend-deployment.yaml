@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jivs-frontend-service
+  namespace: jivs-platform
+  labels:
+    app: jivs-frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: jivs-frontend
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jivs-frontend
+  namespace: jivs-platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: jivs-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: jivs-frontend
+        version: v1
+    spec:
+      containers:
+        - name: frontend
+          image: jivs-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              name: http
+          envFrom:
+            - configMapRef:
+                name: jivs-frontend-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: jivs-frontend-hpa
+  namespace: jivs-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jivs-frontend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: jivs-frontend-pdb
+  namespace: jivs-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: jivs-frontend

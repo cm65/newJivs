@@ -1,0 +1,331 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: jivs-platform
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'jivs-production'
+        environment: 'production'
+
+    # Alertmanager configuration
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - alertmanager-service:9093
+
+    # Load alerting rules
+    rule_files:
+      - '/etc/prometheus/alerts/*.yml'
+
+    # Scrape configurations
+    scrape_configs:
+      # Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Kubernetes API server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+      # Kubernetes nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+
+      # Kubernetes pods
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - jivs-platform
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # JiVS Backend
+      - job_name: 'jivs-backend'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - jivs-platform
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: jivs-backend-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: http
+        metrics_path: '/actuator/prometheus'
+
+      # PostgreSQL
+      - job_name: 'postgres'
+        static_configs:
+          - targets: ['postgres-exporter:9187']
+
+      # Redis
+      - job_name: 'redis'
+        static_configs:
+          - targets: ['redis-exporter:9121']
+
+      # Elasticsearch
+      - job_name: 'elasticsearch'
+        static_configs:
+          - targets: ['elasticsearch-exporter:9114']
+
+      # RabbitMQ
+      - job_name: 'rabbitmq'
+        static_configs:
+          - targets: ['rabbitmq:15692']
+
+      # Node Exporter
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: '(.*):10250'
+            replacement: '${1}:9100'
+            target_label: __address__
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: jivs-platform
+data:
+  alerts.yml: |
+    groups:
+      - name: jivs_application_alerts
+        interval: 30s
+        rules:
+          # High Error Rate
+          - alert: HighErrorRate
+            expr: |
+              rate(http_server_requests_seconds_count{status=~"5.."}[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value }} per second for {{ $labels.instance }}"
+
+          # High Response Time
+          - alert: HighResponseTime
+            expr: |
+              histogram_quantile(0.95,
+                rate(http_server_requests_seconds_bucket[5m])
+              ) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High response time detected"
+              description: "95th percentile response time is {{ $value }}s for {{ $labels.instance }}"
+
+          # Service Down
+          - alert: ServiceDown
+            expr: up{job="jivs-backend"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Service is down"
+              description: "{{ $labels.job }} on {{ $labels.instance }} is down"
+
+          # High CPU Usage
+          - alert: HighCPUUsage
+            expr: |
+              rate(process_cpu_seconds_total[5m]) > 0.8
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage"
+              description: "CPU usage is {{ humanizePercentage $value }} for {{ $labels.instance }}"
+
+          # High Memory Usage
+          - alert: HighMemoryUsage
+            expr: |
+              (process_resident_memory_bytes /
+               node_memory_MemTotal_bytes) > 0.9
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage"
+              description: "Memory usage is {{ humanizePercentage $value }} for {{ $labels.instance }}"
+
+      - name: database_alerts
+        interval: 30s
+        rules:
+          # PostgreSQL Down
+          - alert: PostgreSQLDown
+            expr: pg_up == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "PostgreSQL is down"
+              description: "PostgreSQL instance {{ $labels.instance }} is down"
+
+          # High Database Connections
+          - alert: HighDatabaseConnections
+            expr: |
+              (pg_stat_database_numbackends /
+               pg_settings_max_connections) > 0.8
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High database connections"
+              description: "Database connections at {{ humanizePercentage $value }}"
+
+          # Long Running Queries
+          - alert: LongRunningQuery
+            expr: |
+              pg_stat_activity_max_tx_duration > 300
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Long running query detected"
+              description: "Query running for {{ $value }}s on {{ $labels.instance }}"
+
+          # Replication Lag
+          - alert: PostgreSQLReplicationLag
+            expr: |
+              (pg_replication_lag > 10)
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PostgreSQL replication lag detected"
+              description: "Replication lag is {{ $value }}s on {{ $labels.instance }}"
+
+      - name: cache_alerts
+        interval: 30s
+        rules:
+          # Redis Down
+          - alert: RedisDown
+            expr: redis_up == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Redis is down"
+              description: "Redis instance {{ $labels.instance }} is down"
+
+          # High Redis Memory Usage
+          - alert: HighRedisMemoryUsage
+            expr: |
+              (redis_memory_used_bytes /
+               redis_memory_max_bytes) > 0.9
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High Redis memory usage"
+              description: "Redis memory usage is {{ humanizePercentage $value }}"
+
+          # Redis Evictions
+          - alert: RedisEvictions
+            expr: |
+              rate(redis_evicted_keys_total[5m]) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Redis evicting keys"
+              description: "Redis is evicting {{ $value }} keys/s on {{ $labels.instance }}"
+
+      - name: kubernetes_alerts
+        interval: 30s
+        rules:
+          # Pod Crash Looping
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total[15m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Pod {{ $labels.pod }} is crash looping"
+
+          # Pod Not Ready
+          - alert: PodNotReady
+            expr: |
+              kube_pod_status_phase{phase!="Running"} > 0
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod not ready"
+              description: "Pod {{ $labels.pod }} is not ready for 15m"
+
+          # Node Not Ready
+          - alert: NodeNotReady
+            expr: |
+              kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node not ready"
+              description: "Node {{ $labels.node }} is not ready"
+
+          # High Node Memory Usage
+          - alert: HighNodeMemoryUsage
+            expr: |
+              (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) /
+               node_memory_MemTotal_bytes > 0.9
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High node memory usage"
+              description: "Node {{ $labels.node }} memory usage is {{ humanizePercentage $value }}"

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jivs-platform
+  labels:
+    name: jivs-platform
+    environment: production
