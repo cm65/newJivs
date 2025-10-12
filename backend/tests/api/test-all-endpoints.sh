@@ -57,7 +57,7 @@ test_endpoint() {
     # Execute request
     local response=$(eval $curl_cmd)
     local status_code=$(echo "$response" | tail -n1)
-    local body=$(echo "$response" | head -n -1)
+    local body=$(echo "$response" | sed '$d')
 
     # Check if status code matches expected
     if [ "$status_code" == "$expected_status" ]; then
@@ -349,7 +349,7 @@ echo "=== ViewsController ===="
 test_endpoint "ViewsController" "GET" "/views?module=extractions" "" "200" "Get views"
 test_endpoint "ViewsController" "POST" "/views" '{"viewName":"test-view","module":"extractions","filters":{}}' "201" "Create view"
 test_endpoint "ViewsController" "GET" "/views/test-view?module=extractions" "" "200" "Get view by name"
-test_endpoint "ViewsController" "PUT" "/views/test-view?module=extractions" '{"filters":{}}' "200" "Update view"
+test_endpoint "ViewsController" "PUT" "/views/test-view?module=extractions" '{"module":"extractions","viewName":"test-view","filters":{}}' "200" "Update view"
 test_endpoint "ViewsController" "POST" "/views/test-view/set-default?module=extractions" "" "200" "Set default"
 test_endpoint "ViewsController" "GET" "/views/default?module=extractions" "" "200" "Get default view"
 test_endpoint "ViewsController" "GET" "/views/count?module=extractions" "" "200" "Get view count"

@@ -21,11 +21,12 @@ public class UserPreferencesService {
 
     /**
      * Get user preferences, creating default if not exists
+     * Note: Not readOnly because it may create default preferences
      *
      * @param userId User ID
      * @return User preferences
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public UserPreferences getUserPreferences(Long userId) {
         log.debug("Getting preferences for user: {}", userId);
         return repository.findByUserId(userId)
