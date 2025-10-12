@@ -6,6 +6,7 @@ import com.jivs.platform.common.exception.ResourceNotFoundException;
 import com.jivs.platform.common.util.StringUtil;
 import com.jivs.platform.domain.extraction.DataSource;
 import com.jivs.platform.domain.extraction.ExtractionJob;
+import com.jivs.platform.event.ExtractionEventPublisher;
 import com.jivs.platform.repository.DataSourceRepository;
 import com.jivs.platform.repository.ExtractionJobRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Service for data extraction operations
+ * Service for data extraction operations with WebSocket real-time updates
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class ExtractionService {
     private final DataSourceRepository dataSourceRepository;
     private final RabbitTemplate rabbitTemplate;
     private final ConnectorFactory connectorFactory;
+    private final ExtractionEventPublisher eventPublisher;
 
     /**
      * Create a new extraction job
@@ -50,8 +52,8 @@ public class ExtractionService {
             throw new BusinessException("Data source is not active: " + dataSource.getName());
         }
 
-        // Check for running jobs
-        List<ExtractionJob> runningJobs = extractionJobRepository.findRunningJobs();
+        // P0.4: Check for running jobs with optimized query (avoids N+1)
+        List<ExtractionJob> runningJobs = extractionJobRepository.findRunningJobsWithDataSource();
         if (runningJobs.stream().anyMatch(job -> job.getDataSource().getId().equals(dataSourceId))) {
             throw new BusinessException("An extraction job is already running for this data source");
         }
@@ -65,6 +67,9 @@ public class ExtractionService {
 
         ExtractionJob savedJob = extractionJobRepository.save(job);
         log.info("Extraction job created: {}", savedJob.getJobId());
+
+        // Publish status changed event
+        eventPublisher.publishStatusChanged(savedJob.getJobId(), "PENDING", "Extraction job created");
 
         // Queue job for processing
         queueExtractionJob(savedJob);
@@ -86,14 +91,15 @@ public class ExtractionService {
     }
 
     /**
-     * Execute extraction job asynchronously
+     * Execute extraction job asynchronously with real-time progress updates
      */
     @Async
     @Transactional
     public CompletableFuture<ExtractionJob> executeExtractionJob(String jobId) {
         log.info("Starting extraction job execution: {}", jobId);
 
-        ExtractionJob job = extractionJobRepository.findByJobId(jobId)
+        // P0.4: Use optimized query with JOIN FETCH to eliminate N+1 query
+        ExtractionJob job = extractionJobRepository.findByJobIdWithDataSource(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("ExtractionJob", "jobId", jobId));
 
         try {
@@ -101,6 +107,9 @@ public class ExtractionService {
             job.setStatus(ExtractionJob.JobStatus.RUNNING);
             job.setStartTime(LocalDateTime.now());
             extractionJobRepository.save(job);
+
+            // Publish started event
+            eventPublisher.publishStarted(jobId);
 
             // Get appropriate connector
             DataConnector connector = connectorFactory.getConnector(job.getDataSource());
@@ -123,12 +132,18 @@ public class ExtractionService {
             log.info("Extraction job completed successfully: {} - Records: {}",
                     jobId, result.getRecordsExtracted());
 
+            // Publish completed event
+            eventPublisher.publishCompleted(jobId, result.getRecordsExtracted());
+
         } catch (Exception e) {
             log.error("Extraction job failed: {}", jobId, e);
             job.setStatus(ExtractionJob.JobStatus.FAILED);
             job.setEndTime(LocalDateTime.now());
             job.setErrorMessage(e.getMessage());
             job.setErrorStackTrace(getStackTraceString(e));
+
+            // Publish failed event
+            eventPublisher.publishFailed(jobId, e.getMessage());
         }
 
         ExtractionJob updatedJob = extractionJobRepository.save(job);
@@ -187,6 +202,9 @@ public class ExtractionService {
 
         ExtractionJob updatedJob = extractionJobRepository.save(job);
         log.info("Extraction job cancelled: {}", jobId);
+
+        // Publish cancelled event
+        eventPublisher.publishCancelled(jobId);
 
         return updatedJob;
     }

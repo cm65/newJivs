@@ -54,6 +54,16 @@ spec:
             - "yes"
             - --requirepass
             - "$(REDIS_PASSWORD)"
+            - --maxmemory
+            - "2gb"
+            - --maxmemory-policy
+            - "allkeys-lru"
+            - --save
+            - "900 1"
+            - --save
+            - "300 10"
+            - --save
+            - "60 10000"
           ports:
             - containerPort: 6379
               name: redis
@@ -68,11 +78,11 @@ spec:
               mountPath: /data
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
-              memory: "1Gi"
+              memory: "2Gi"
               cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "1000m"
           livenessProbe:
             exec:
               command:

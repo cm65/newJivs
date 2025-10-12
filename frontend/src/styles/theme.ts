@@ -490,3 +490,5 @@ export const visuallyHidden = {
 };
 
 export default theme;
+// Export theme options for dark mode
+export { themeOptions };

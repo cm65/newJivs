@@ -23,11 +23,27 @@ spring:
     password: ${DATABASE_PASSWORD:jivs}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      # P0.5: Increased pool size for high concurrency
+      maximum-pool-size: 50              # Was: 20
+      minimum-idle: 10                   # Was: 5
+
+      # Faster failure detection
+      connection-timeout: 5000           # Was: 30000 (5s vs 30s)
+      validation-timeout: 3000           # NEW: Validate connections quickly
+
+      # Reduce connection churn
+      idle-timeout: 300000               # Was: 600000 (5min vs 10min)
+      max-lifetime: 900000               # Was: 1800000 (15min vs 30min)
+
+      # Connection pool health
+      leak-detection-threshold: 60000    # NEW: Detect leaks after 1min
+      connection-test-query: SELECT 1    # NEW: Explicit health check
+
+      # Performance tuning
+      auto-commit: false                 # NEW: Manual transaction control
+
+      # Monitoring
+      register-mbeans: true              # NEW: JMX monitoring
 
   jpa:
     hibernate:
@@ -38,9 +54,21 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
-          batch_size: 20
+          batch_size: 50              # Was: 20 - Increased for bulk operations
+          batch_versioned_data: true  # NEW: Enable batch updates with versioning
         order_inserts: true
         order_updates: true
+
+        # Query optimization
+        query:
+          in_clause_parameter_padding: true  # NEW: Optimize IN clauses
+          plan_cache_max_size: 2048          # NEW: Larger query plan cache
+
+        # Second-level cache (for reference data)
+        cache:
+          use_second_level_cache: true       # NEW: Enable L2 cache
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
     open-in-view: false
 
   flyway:
@@ -209,9 +237,18 @@ jivs:
       credentials-path: ${GCP_CREDENTIALS_PATH:}
 
   extraction:
-    max-parallel-jobs: 5
-    batch-size: 10000
+    # P0.1 & P0.5: Optimized extraction settings
+    max-parallel-jobs: 10                # Was: 5 (utilize connection pool)
+    batch-size: 1000                     # Was: 10000 (reduce memory)
+    fetch-size: 1000                     # NEW: ResultSet fetch size
+    parallel-threads: 4                  # NEW: Threads per extraction
     temp-directory: /tmp/jivs/extraction
+
+    # P0.2: Connection pool per data source
+    source-pool:
+      max-size: 10                       # NEW: Max connections per source
+      min-idle: 2                        # NEW: Min idle connections
+      timeout: 5000                      # NEW: Connection timeout (5s)
 
   migration:
     max-parallel-jobs: 3

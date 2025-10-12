@@ -37,6 +37,17 @@ export interface MigrationStatistics {
   throughput: number;
 }
 
+export interface BulkActionResponse {
+  status: string;
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  successfulIds: string[];
+  failedIds: Record<string, string>;
+  message: string;
+  processingTimeMs: number;
+}
+
 class MigrationService {
   /**
    * Create a new migration job
@@ -124,6 +135,52 @@ class MigrationService {
   async validateMigration(config: MigrationConfig): Promise<any> {
     const response = await apiClient.post('/migrations/validate', config);
     return response.data.data || response.data;
+  }
+
+  /**
+   * Perform bulk action on multiple migrations
+   */
+  async bulkAction(ids: string[], action: string): Promise<BulkActionResponse> {
+    const response = await apiClient.post('/migrations/bulk', {
+      ids,
+      action,
+    });
+    return response.data;
+  }
+
+  /**
+   * Start multiple migrations
+   */
+  async bulkStart(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'start');
+  }
+
+  /**
+   * Pause multiple migrations
+   */
+  async bulkPause(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'pause');
+  }
+
+  /**
+   * Resume multiple migrations
+   */
+  async bulkResume(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'resume');
+  }
+
+  /**
+   * Delete multiple migrations
+   */
+  async bulkDelete(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'delete');
+  }
+
+  /**
+   * Export multiple migrations
+   */
+  async bulkExport(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'export');
   }
 }
 

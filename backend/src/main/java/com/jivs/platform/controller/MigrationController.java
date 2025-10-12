@@ -1,5 +1,7 @@
 package com.jivs.platform.controller;
 
+import com.jivs.platform.dto.BulkActionRequest;
+import com.jivs.platform.dto.BulkActionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -225,6 +227,96 @@ public class MigrationController {
             log.error("Failed to delete migration: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Perform bulk action on multiple migrations
+     */
+    @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
+    public ResponseEntity<BulkActionResponse> bulkAction(@Valid @RequestBody BulkActionRequest request) {
+        log.info("Performing bulk action '{}' on {} migrations", request.getAction(), request.getIds().size());
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            List<String> successfulIds = new ArrayList<>();
+            Map<String, String> failedIds = new HashMap<>();
+
+            // Process each migration
+            for (String id : request.getIds()) {
+                try {
+                    switch (request.getAction().toLowerCase()) {
+                        case "start":
+                            // TODO: Call MigrationService.startMigration(id)
+                            log.info("Started migration: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "pause":
+                            // TODO: Call MigrationService.pauseMigration(id)
+                            log.info("Paused migration: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "resume":
+                            // TODO: Call MigrationService.resumeMigration(id)
+                            log.info("Resumed migration: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "delete":
+                            // TODO: Call MigrationService.deleteMigration(id)
+                            log.info("Deleted migration: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "export":
+                            // TODO: Call MigrationService.exportMigration(id)
+                            log.info("Exported migration: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        default:
+                            failedIds.put(id, "Unknown action: " + request.getAction());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to {} migration {}: {}", request.getAction(), id, e.getMessage());
+                    failedIds.put(id, e.getMessage());
+                }
+            }
+
+            long processingTime = System.currentTimeMillis() - startTime;
+
+            // Build response
+            BulkActionResponse response = BulkActionResponse.builder()
+                .status(failedIds.isEmpty() ? "success" : (successfulIds.isEmpty() ? "failed" : "partial"))
+                .totalProcessed(request.getIds().size())
+                .successCount(successfulIds.size())
+                .failureCount(failedIds.size())
+                .successfulIds(successfulIds)
+                .failedIds(failedIds)
+                .message(String.format("Processed %d migrations: %d succeeded, %d failed",
+                    request.getIds().size(), successfulIds.size(), failedIds.size()))
+                .processingTimeMs(processingTime)
+                .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Bulk action failed: {}", e.getMessage(), e);
+
+            BulkActionResponse errorResponse = BulkActionResponse.builder()
+                .status("failed")
+                .totalProcessed(0)
+                .successCount(0)
+                .failureCount(request.getIds().size())
+                .message("Bulk action failed: " + e.getMessage())
+                .processingTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 

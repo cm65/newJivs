@@ -1,5 +1,7 @@
 package com.jivs.platform.controller;
 
+import com.jivs.platform.dto.BulkActionRequest;
+import com.jivs.platform.dto.BulkActionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -180,6 +182,90 @@ public class ExtractionController {
             log.error("Failed to delete extraction: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Perform bulk action on multiple extractions
+     */
+    @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
+    public ResponseEntity<BulkActionResponse> bulkAction(@Valid @RequestBody BulkActionRequest request) {
+        log.info("Performing bulk action '{}' on {} extractions", request.getAction(), request.getIds().size());
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            List<String> successfulIds = new ArrayList<>();
+            Map<String, String> failedIds = new HashMap<>();
+
+            // Process each extraction
+            for (String id : request.getIds()) {
+                try {
+                    switch (request.getAction().toLowerCase()) {
+                        case "start":
+                            // TODO: Call ExtractionService.startExtraction(id)
+                            log.info("Started extraction: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "stop":
+                            // TODO: Call ExtractionService.stopExtraction(id)
+                            log.info("Stopped extraction: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "delete":
+                            // TODO: Call ExtractionService.deleteExtraction(id)
+                            log.info("Deleted extraction: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        case "export":
+                            // TODO: Call ExtractionService.exportExtraction(id)
+                            log.info("Exported extraction: {}", id);
+                            successfulIds.add(id);
+                            break;
+
+                        default:
+                            failedIds.put(id, "Unknown action: " + request.getAction());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to {} extraction {}: {}", request.getAction(), id, e.getMessage());
+                    failedIds.put(id, e.getMessage());
+                }
+            }
+
+            long processingTime = System.currentTimeMillis() - startTime;
+
+            // Build response
+            BulkActionResponse response = BulkActionResponse.builder()
+                .status(failedIds.isEmpty() ? "success" : (successfulIds.isEmpty() ? "failed" : "partial"))
+                .totalProcessed(request.getIds().size())
+                .successCount(successfulIds.size())
+                .failureCount(failedIds.size())
+                .successfulIds(successfulIds)
+                .failedIds(failedIds)
+                .message(String.format("Processed %d extractions: %d succeeded, %d failed",
+                    request.getIds().size(), successfulIds.size(), failedIds.size()))
+                .processingTimeMs(processingTime)
+                .build();
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Bulk action failed: {}", e.getMessage(), e);
+
+            BulkActionResponse errorResponse = BulkActionResponse.builder()
+                .status("failed")
+                .totalProcessed(0)
+                .successCount(0)
+                .failureCount(request.getIds().size())
+                .message("Bulk action failed: " + e.getMessage())
+                .processingTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 

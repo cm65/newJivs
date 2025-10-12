@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -20,6 +21,7 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  TableSortLabel,
   TextField,
   Tooltip,
   Typography,
@@ -37,8 +39,16 @@ import {
   Refresh as RefreshIcon,
   Visibility as ViewIcon,
   Assessment as StatsIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon,
 } from '@mui/icons-material';
 import extractionService, { Extraction, ExtractionConfig } from '../services/extractionService';
+import FilterBuilder, { FilterGroup } from '../components/FilterBuilder';
+import QuickFilters, { QuickFilter } from '../components/QuickFilters';
+import SavedViews from '../components/SavedViews';
+import BulkOperationsToolbar from '../components/BulkOperationsToolbar';
+import { useAdvancedFilters, SortConfig } from '../hooks/useAdvancedFilters';
+import websocketService from '../services/websocket.service';
 
 const Extractions: React.FC = () => {
   const [extractions, setExtractions] = useState<Extraction[]>([]);
@@ -47,22 +57,155 @@ const Extractions: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalElements, setTotalElements] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<string>('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newExtraction, setNewExtraction] = useState<Partial<ExtractionConfig>>({
     name: '',
     sourceType: 'JDBC',
     connectionConfig: {},
   });
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string | undefined>();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Advanced filters and sorting
+  const { filters, sort, setFilters, setSort, clearFilters, clearSort } =
+    useAdvancedFilters('extractions');
+
+  // Define filterable fields
+  const filterFields = [
+    { value: 'name', label: 'Name', type: 'string' },
+    { value: 'sourceType', label: 'Source Type', type: 'enum' },
+    { value: 'status', label: 'Status', type: 'enum' },
+    { value: 'recordsExtracted', label: 'Records Extracted', type: 'number' },
+    { value: 'createdAt', label: 'Created Date', type: 'date' },
+  ];
+
+  // Define quick filters
+  const quickFilters: QuickFilter[] = [
+    {
+      id: 'active',
+      label: 'Active',
+      color: 'info',
+      filters: [
+        {
+          id: '1',
+          logic: 'OR',
+          conditions: [
+            { id: '1', field: 'status', operator: 'equals', value: 'RUNNING' },
+            { id: '2', field: 'status', operator: 'equals', value: 'PENDING' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'failed',
+      label: 'Failed',
+      color: 'error',
+      filters: [
+        {
+          id: '1',
+          logic: 'AND',
+          conditions: [{ id: '1', field: 'status', operator: 'equals', value: 'FAILED' }],
+        },
+      ],
+    },
+    {
+      id: 'completed_today',
+      label: 'Completed Today',
+      color: 'success',
+      filters: [
+        {
+          id: '1',
+          logic: 'AND',
+          conditions: [
+            { id: '1', field: 'status', operator: 'equals', value: 'COMPLETED' },
+            {
+              id: '2',
+              field: 'createdAt',
+              operator: 'after',
+              value: new Date().toISOString().split('T')[0],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'high_volume',
+      label: 'High Volume (>10k records)',
+      color: 'warning',
+      filters: [
+        {
+          id: '1',
+          logic: 'AND',
+          conditions: [
+            { id: '1', field: 'recordsExtracted', operator: 'greater_than', value: 10000 },
+          ],
+        },
+      ],
+    },
+  ];
 
   useEffect(() => {
     loadExtractions();
-  }, [page, rowsPerPage, statusFilter]);
+  }, [page, rowsPerPage, filters, sort]);
+
+  // WebSocket connection and subscription for real-time updates
+  useEffect(() => {
+    let subscriptionKey: string | null = null;
+    let mounted = true;
+
+    const connectAndSubscribe = async () => {
+      try {
+        if (!mounted) return; // Guard against unmount during async
+
+        // Connect to WebSocket if not already connected
+        if (!websocketService.isConnected()) {
+          await websocketService.connect();
+        }
+
+        if (!mounted) return; // Check again after async operation
+
+        // Subscribe to all extraction updates
+        subscriptionKey = websocketService.subscribeToAllExtractions((update) => {
+          if (!mounted) return; // Ignore updates after unmount
+
+          console.log('Received extraction update:', update);
+
+          // Update the extraction in the list
+          setExtractions((prevExtractions) =>
+            prevExtractions.map((extraction) =>
+              extraction.id === update.id
+                ? {
+                    ...extraction,
+                    status: update.status || extraction.status,
+                    recordsExtracted: update.recordsExtracted || extraction.recordsExtracted,
+                    progress: update.progress || extraction.progress,
+                  }
+                : extraction
+            )
+          );
+        });
+      } catch (error) {
+        console.error('Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectAndSubscribe();
+
+    // Cleanup on unmount
+    return () => {
+      mounted = false; // Prevent state updates after unmount
+      if (subscriptionKey) {
+        websocketService.unsubscribe(subscriptionKey);
+      }
+    };
+  }, []);
 
   const loadExtractions = async () => {
     try {
       setLoading(true);
-      const response = await extractionService.getExtractions(page, rowsPerPage, statusFilter);
+      // For now, we'll ignore advanced filters in the API call
+      // In production, you'd convert filters and sort to API params
+      const response = await extractionService.getExtractions(page, rowsPerPage);
       setExtractions(response.content || []);
       setTotalElements(response.totalElements || 0);
       setError(null);
@@ -113,6 +256,70 @@ const Extractions: React.FC = () => {
     }
   };
 
+  const handleSort = (field: string, shiftKey: boolean) => {
+    const existingSort = sort.find((s) => s.field === field);
+    let newSort: SortConfig[];
+
+    if (shiftKey) {
+      // Multi-column sort
+      if (existingSort) {
+        // Toggle direction
+        newSort = sort.map((s) =>
+          s.field === field ? { ...s, direction: s.direction === 'asc' ? 'desc' : 'asc' } : s
+        );
+      } else {
+        // Add new sort column
+        newSort = [...sort, { field, direction: 'asc' }];
+      }
+    } else {
+      // Single column sort
+      if (existingSort && existingSort.direction === 'asc') {
+        newSort = [{ field, direction: 'desc' }];
+      } else if (existingSort && existingSort.direction === 'desc') {
+        newSort = [];
+      } else {
+        newSort = [{ field, direction: 'asc' }];
+      }
+    }
+
+    setSort(newSort);
+  };
+
+  const getSortDirection = (field: string): 'asc' | 'desc' | false => {
+    const sortConfig = sort.find((s) => s.field === field);
+    return sortConfig ? sortConfig.direction : false;
+  };
+
+  const getSortIndex = (field: string): number => {
+    const index = sort.findIndex((s) => s.field === field);
+    return index >= 0 ? index + 1 : 0;
+  };
+
+  const handleApplyFilters = (newFilters: FilterGroup[]) => {
+    setFilters(newFilters);
+    setActiveQuickFilter(undefined);
+    setPage(0);
+  };
+
+  const handleClearFilters = () => {
+    clearFilters();
+    setActiveQuickFilter(undefined);
+    setPage(0);
+  };
+
+  const handleApplyQuickFilter = (newFilters: FilterGroup[], filterId: string) => {
+    setFilters(newFilters);
+    setActiveQuickFilter(filterId);
+    setPage(0);
+  };
+
+  const handleApplySavedView = (view: any) => {
+    setFilters(view.filters);
+    setSort(view.sort);
+    setActiveQuickFilter(undefined);
+    setPage(0);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'COMPLETED':
@@ -128,6 +335,60 @@ const Extractions: React.FC = () => {
     }
   };
 
+  // Bulk operations handlers
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedIds(extractions.map((e) => e.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkStart = async (ids: string[]) => {
+    try {
+      await extractionService.bulkStart(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to start selected extractions');
+    }
+  };
+
+  const handleBulkStop = async (ids: string[]) => {
+    try {
+      await extractionService.bulkStop(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to stop selected extractions');
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      await extractionService.bulkDelete(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete selected extractions');
+    }
+  };
+
+  const handleBulkExport = async (ids: string[]) => {
+    try {
+      await extractionService.bulkExport(ids);
+      setSelectedIds([]);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to export selected extractions');
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -140,11 +401,7 @@ const Extractions: React.FC = () => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadExtractions}
-          >
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadExtractions}>
             Refresh
           </Button>
           <Button
@@ -213,47 +470,167 @@ const Extractions: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Filter */}
-      <Box sx={{ mb: 2 }}>
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Status</InputLabel>
-          <Select
-            value={statusFilter}
-            label="Filter by Status"
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="PENDING">Pending</MenuItem>
-            <MenuItem value="RUNNING">Running</MenuItem>
-            <MenuItem value="COMPLETED">Completed</MenuItem>
-            <MenuItem value="FAILED">Failed</MenuItem>
-          </Select>
-        </FormControl>
+      {/* Quick Filters */}
+      <QuickFilters
+        quickFilters={quickFilters}
+        activeFilterId={activeQuickFilter}
+        onApply={handleApplyQuickFilter}
+        onClear={handleClearFilters}
+      />
+
+      {/* Advanced Filters and Saved Views */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
+        <FilterBuilder
+          fields={filterFields}
+          filters={filters}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
+        <SavedViews
+          module="extractions"
+          currentFilters={filters}
+          currentSort={sort}
+          onApply={handleApplySavedView}
+        />
+        {sort.length > 0 && (
+          <Chip
+            label={`Sorted by ${sort.length} column${sort.length > 1 ? 's' : ''}`}
+            onDelete={clearSort}
+            color="primary"
+            variant="outlined"
+          />
+        )}
       </Box>
+
+      {/* Bulk Operations Toolbar */}
+      {selectedIds.length > 0 && (
+        <BulkOperationsToolbar
+          selectedIds={selectedIds}
+          actions={[
+            {
+              id: 'start',
+              label: 'Start',
+              icon: <PlayIcon />,
+              color: 'primary',
+              onExecute: handleBulkStart,
+            },
+            {
+              id: 'stop',
+              label: 'Stop',
+              icon: <StopIcon />,
+              color: 'warning',
+              confirmMessage: 'Are you sure you want to stop the selected extractions?',
+              onExecute: handleBulkStop,
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: <DeleteIcon />,
+              color: 'error',
+              confirmMessage: 'Are you sure you want to delete the selected extractions? This action cannot be undone.',
+              onExecute: handleBulkDelete,
+            },
+          ]}
+          onClearSelection={() => setSelectedIds([])}
+        />
+      )}
 
       {/* Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Source Type</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Records Extracted</TableCell>
-              <TableCell>Created At</TableCell>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedIds.length > 0 && selectedIds.length < extractions.length}
+                  checked={extractions.length > 0 && selectedIds.length === extractions.length}
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={getSortDirection('name') !== false}
+                  direction={getSortDirection('name') || 'asc'}
+                  onClick={(e) => handleSort('name', e.shiftKey)}
+                  IconComponent={sort.length > 1 ? ArrowUpIcon : undefined}
+                >
+                  Name
+                  {sort.length > 1 && getSortIndex('name') > 0 && (
+                    <Box component="span" sx={{ ml: 0.5, fontSize: '0.75rem' }}>
+                      {getSortIndex('name')}
+                    </Box>
+                  )}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={getSortDirection('sourceType') !== false}
+                  direction={getSortDirection('sourceType') || 'asc'}
+                  onClick={(e) => handleSort('sourceType', e.shiftKey)}
+                >
+                  Source Type
+                  {sort.length > 1 && getSortIndex('sourceType') > 0 && (
+                    <Box component="span" sx={{ ml: 0.5, fontSize: '0.75rem' }}>
+                      {getSortIndex('sourceType')}
+                    </Box>
+                  )}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={getSortDirection('status') !== false}
+                  direction={getSortDirection('status') || 'asc'}
+                  onClick={(e) => handleSort('status', e.shiftKey)}
+                >
+                  Status
+                  {sort.length > 1 && getSortIndex('status') > 0 && (
+                    <Box component="span" sx={{ ml: 0.5, fontSize: '0.75rem' }}>
+                      {getSortIndex('status')}
+                    </Box>
+                  )}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell align="right">
+                <TableSortLabel
+                  active={getSortDirection('recordsExtracted') !== false}
+                  direction={getSortDirection('recordsExtracted') || 'asc'}
+                  onClick={(e) => handleSort('recordsExtracted', e.shiftKey)}
+                >
+                  Records Extracted
+                  {sort.length > 1 && getSortIndex('recordsExtracted') > 0 && (
+                    <Box component="span" sx={{ ml: 0.5, fontSize: '0.75rem' }}>
+                      {getSortIndex('recordsExtracted')}
+                    </Box>
+                  )}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={getSortDirection('createdAt') !== false}
+                  direction={getSortDirection('createdAt') || 'asc'}
+                  onClick={(e) => handleSort('createdAt', e.shiftKey)}
+                >
+                  Created At
+                  {sort.length > 1 && getSortIndex('createdAt') > 0 && (
+                    <Box component="span" sx={{ ml: 0.5, fontSize: '0.75rem' }}>
+                      {getSortIndex('createdAt')}
+                    </Box>
+                  )}
+                </TableSortLabel>
+              </TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : extractions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary">
                     No extractions found
                   </Typography>
@@ -262,6 +639,12 @@ const Extractions: React.FC = () => {
             ) : (
               extractions.map((extraction) => (
                 <TableRow key={extraction.id} hover>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.includes(extraction.id)}
+                      onChange={() => handleSelectOne(extraction.id)}
+                    />
+                  </TableCell>
                   <TableCell>{extraction.name}</TableCell>
                   <TableCell>{extraction.sourceType || 'N/A'}</TableCell>
                   <TableCell>

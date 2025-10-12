@@ -36,6 +36,10 @@ spec:
       labels:
         app: jivs-backend
         version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       affinity:
         podAntiAffinity:
@@ -56,6 +60,8 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 9010
+              name: jmx
           env:
             - name: SPRING_PROFILE
               valueFrom:
@@ -143,17 +149,26 @@ spec:
                   name: jivs-backend-secrets
                   key: AWS_SECRET_KEY
             - name: JAVA_OPTS
-              valueFrom:
-                configMapKeyRef:
-                  name: jivs-backend-config
-                  key: JVM_OPTS
+              value: >-
+                -Xms2g -Xmx4g
+                -XX:+UseG1GC
+                -XX:MaxGCPauseMillis=200
+                -XX:+HeapDumpOnOutOfMemoryError
+                -XX:HeapDumpPath=/app/logs/heapdump.hprof
+                -Dcom.sun.management.jmxremote
+                -Dcom.sun.management.jmxremote.port=9010
+                -Dcom.sun.management.jmxremote.authenticate=false
+                -Dcom.sun.management.jmxremote.ssl=false
+                -Dcom.sun.management.jmxremote.local.only=false
+                -Dcom.sun.management.jmxremote.rmi.port=9010
+                -Djava.rmi.server.hostname=127.0.0.1
           resources:
             requests:
-              memory: "2Gi"
-              cpu: "1000m"
+              memory: "3Gi"
+              cpu: "1500m"
             limits:
-              memory: "4Gi"
-              cpu: "2000m"
+              memory: "5Gi"
+              cpu: "2500m"
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -175,12 +190,17 @@ spec:
               mountPath: /app/logs
             - name: storage
               mountPath: /var/jivs/storage
+            - name: extraction-temp
+              mountPath: /tmp/jivs/extraction
       volumes:
         - name: logs
           emptyDir: {}
         - name: storage
           persistentVolumeClaim:
             claimName: jivs-backend-storage
+        - name: extraction-temp
+          emptyDir:
+            sizeLimit: 20Gi
 
 ---
 apiVersion: v1

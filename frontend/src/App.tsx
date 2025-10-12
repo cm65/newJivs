@@ -1,15 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { CssBaseline } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import { Provider } from 'react-redux';
 
 import 'react-toastify/dist/ReactToastify.css';
 
 import { store } from './store';
-import { theme } from './styles/theme';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeModeProvider } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
@@ -25,6 +25,8 @@ import BusinessObjects from './pages/BusinessObjects';
 import Documents from './pages/Documents';
 import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
+import Notifications from './pages/Notifications';
+import Profile from './pages/Profile';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,9 +41,9 @@ function App() {
   return (
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <AuthProvider>
+        <AuthProvider>
+          <ThemeModeProvider>
+            <CssBaseline />
             <Router>
               <Routes>
                 {/* Auth Routes */}
@@ -65,7 +67,9 @@ function App() {
                   <Route path="/business-objects" element={<BusinessObjects />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/settings/profile" element={<Profile />} />
                   <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/notifications" element={<Notifications />} />
                 </Route>
 
                 {/* Default Route */}
@@ -83,8 +87,8 @@ function App() {
               draggable
               pauseOnHover
             />
-          </AuthProvider>
-        </ThemeProvider>
+          </ThemeModeProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </Provider>
   );

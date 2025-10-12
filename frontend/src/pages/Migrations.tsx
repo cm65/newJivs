@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -42,6 +43,8 @@ import {
   Assessment as StatsIcon,
 } from '@mui/icons-material';
 import migrationService, { Migration, MigrationConfig } from '../services/migrationService';
+import BulkOperationsToolbar from '../components/BulkOperationsToolbar';
+import websocketService from '../services/websocket.service';
 
 const Migrations: React.FC = () => {
   const [migrations, setMigrations] = useState<Migration[]>([]);
@@ -57,10 +60,65 @@ const Migrations: React.FC = () => {
     sourceConfig: {},
     targetConfig: {},
   });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadMigrations();
   }, [page, rowsPerPage, statusFilter]);
+
+  // WebSocket connection and subscription for real-time updates
+  useEffect(() => {
+    let subscriptionKey: string | null = null;
+    let mounted = true;
+
+    const connectAndSubscribe = async () => {
+      try {
+        if (!mounted) return; // Guard against unmount during async
+
+        // Connect to WebSocket if not already connected
+        if (!websocketService.isConnected()) {
+          await websocketService.connect();
+        }
+
+        if (!mounted) return; // Check again after async operation
+
+        // Subscribe to all migration updates
+        subscriptionKey = websocketService.subscribeToAllMigrations((update) => {
+          if (!mounted) return; // Ignore updates after unmount
+
+          console.log('Received migration update:', update);
+
+          // Update the migration in the list
+          setMigrations((prevMigrations) =>
+            prevMigrations.map((migration) =>
+              migration.id === update.id
+                ? {
+                    ...migration,
+                    status: update.status || migration.status,
+                    phase: update.phase || migration.phase,
+                    progress: update.progress !== undefined ? update.progress : migration.progress,
+                    recordsMigrated: update.recordsMigrated || migration.recordsMigrated,
+                    totalRecords: update.totalRecords || migration.totalRecords,
+                  }
+                : migration
+            )
+          );
+        });
+      } catch (error) {
+        console.error('Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectAndSubscribe();
+
+    // Cleanup on unmount
+    return () => {
+      mounted = false; // Prevent state updates after unmount
+      if (subscriptionKey) {
+        websocketService.unsubscribe(subscriptionKey);
+      }
+    };
+  }, []);
 
   const loadMigrations = async () => {
     try {
@@ -152,6 +210,70 @@ const Migrations: React.FC = () => {
         return 'default';
       default:
         return 'default';
+    }
+  };
+
+  // Bulk operations handlers
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedIds(migrations.map((m) => m.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkStart = async (ids: string[]) => {
+    try {
+      await migrationService.bulkStart(ids);
+      setSelectedIds([]);
+      loadMigrations();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to start selected migrations');
+    }
+  };
+
+  const handleBulkPause = async (ids: string[]) => {
+    try {
+      await migrationService.bulkPause(ids);
+      setSelectedIds([]);
+      loadMigrations();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to pause selected migrations');
+    }
+  };
+
+  const handleBulkResume = async (ids: string[]) => {
+    try {
+      await migrationService.bulkResume(ids);
+      setSelectedIds([]);
+      loadMigrations();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to resume selected migrations');
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      await migrationService.bulkDelete(ids);
+      setSelectedIds([]);
+      loadMigrations();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete selected migrations');
+    }
+  };
+
+  const handleBulkExport = async (ids: string[]) => {
+    try {
+      await migrationService.bulkExport(ids);
+      setSelectedIds([]);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to export selected migrations');
     }
   };
 
@@ -255,11 +377,58 @@ const Migrations: React.FC = () => {
         </FormControl>
       </Box>
 
+      {/* Bulk Operations Toolbar */}
+      {selectedIds.length > 0 && (
+        <BulkOperationsToolbar
+          selectedIds={selectedIds}
+          actions={[
+            {
+              id: 'start',
+              label: 'Start',
+              icon: <PlayIcon />,
+              color: 'primary',
+              onExecute: handleBulkStart,
+            },
+            {
+              id: 'pause',
+              label: 'Pause',
+              icon: <PauseIcon />,
+              color: 'warning',
+              confirmMessage: 'Are you sure you want to pause the selected migrations?',
+              onExecute: handleBulkPause,
+            },
+            {
+              id: 'resume',
+              label: 'Resume',
+              icon: <ReplayIcon />,
+              color: 'primary',
+              onExecute: handleBulkResume,
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: <DeleteIcon />,
+              color: 'error',
+              confirmMessage: 'Are you sure you want to delete the selected migrations? This action cannot be undone.',
+              onExecute: handleBulkDelete,
+            },
+          ]}
+          onClearSelection={() => setSelectedIds([])}
+        />
+      )}
+
       {/* Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedIds.length > 0 && selectedIds.length < migrations.length}
+                  checked={migrations.length > 0 && selectedIds.length === migrations.length}
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Phase</TableCell>
@@ -272,13 +441,13 @@ const Migrations: React.FC = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : migrations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   <Typography variant="body2" color="text.secondary">
                     No migrations found
                   </Typography>
@@ -287,6 +456,12 @@ const Migrations: React.FC = () => {
             ) : (
               migrations.map((migration) => (
                 <TableRow key={migration.id} hover>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.includes(migration.id)}
+                      onChange={() => handleSelectOne(migration.id)}
+                    />
+                  </TableCell>
                   <TableCell>{migration.name}</TableCell>
                   <TableCell>
                     <Chip

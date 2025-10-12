@@ -25,6 +25,17 @@ export interface ExtractionStatistics {
   throughput: number;
 }
 
+export interface BulkActionResponse {
+  status: string;
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  successfulIds: string[];
+  failedIds: Record<string, string>;
+  message: string;
+  processingTimeMs: number;
+}
+
 class ExtractionService {
   /**
    * Create a new extraction job
@@ -98,6 +109,45 @@ class ExtractionService {
   async getLogs(id: string, limit = 100): Promise<any[]> {
     const response = await apiClient.get(`/extractions/${id}/logs?limit=${limit}`);
     return response.data.data || response.data;
+  }
+
+  /**
+   * Perform bulk action on multiple extractions
+   */
+  async bulkAction(ids: string[], action: string): Promise<BulkActionResponse> {
+    const response = await apiClient.post('/extractions/bulk', {
+      ids,
+      action,
+    });
+    return response.data;
+  }
+
+  /**
+   * Start multiple extractions
+   */
+  async bulkStart(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'start');
+  }
+
+  /**
+   * Stop multiple extractions
+   */
+  async bulkStop(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'stop');
+  }
+
+  /**
+   * Delete multiple extractions
+   */
+  async bulkDelete(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'delete');
+  }
+
+  /**
+   * Export multiple extractions
+   */
+  async bulkExport(ids: string[]): Promise<BulkActionResponse> {
+    return this.bulkAction(ids, 'export');
   }
 }
 

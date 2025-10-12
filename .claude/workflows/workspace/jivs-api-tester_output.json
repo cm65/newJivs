@@ -1,15 +1,123 @@
 {
   "agent": "jivs-api-tester",
-  "task_type": "api_testing",
-  "phase": "testing",
+  "task_type": "load_testing",
+  "phase": "development",
   "status": "success",
-  "execution_time": "45s",
+  "execution_time": "32 minutes",
   "outputs": {
-    "summary": "Agent jivs-api-tester completed api_testing successfully"
+    "test_files_created": [
+      "load-tests/extraction-baseline-test.js",
+      "load-tests/extraction-performance-test.js",
+      "load-tests/extraction-stress-test.js",
+      "load-tests/extraction-soak-test.js",
+      "load-tests/extraction-spike-test.js"
+    ],
+    "test_scripts_created": [
+      "load-tests/setup-test-data.sh",
+      "load-tests/run-extraction-tests.sh",
+      "load-tests/compare-results.js"
+    ],
+    "documentation_created": [
+      "load-tests/README.md"
+    ],
+    "test_scenarios": [
+      "baseline",
+      "performance",
+      "stress",
+      "soak",
+      "spike"
+    ],
+    "test_execution_status": "ready"
+  },
+  "test_suite_details": {
+    "baseline_test": {
+      "purpose": "Establish current performance metrics before optimization",
+      "load_profile": "5-10 VUs, 5 minute duration",
+      "thresholds": {
+        "p95_latency": "< 600ms",
+        "error_rate": "< 5%"
+      }
+    },
+    "performance_test": {
+      "purpose": "Validate optimized system performance against targets",
+      "load_profile": "100 VUs peak, 18 minute duration",
+      "data_sizes": [1000, 10000, 50000, 100000],
+      "source_types": ["JDBC", "FILE", "API"],
+      "thresholds": {
+        "p95_latency": "< 250ms (target: 200ms)",
+        "p99_latency": "< 500ms",
+        "throughput": "> 20,000 records/min",
+        "error_rate": "< 1%"
+      }
+    },
+    "stress_test": {
+      "purpose": "Find system breaking point",
+      "load_profile": "10 → 500 VUs over 21 minutes",
+      "thresholds": {
+        "p95_latency": "< 2000ms",
+        "error_rate": "< 25% at peak"
+      }
+    },
+    "soak_test": {
+      "purpose": "Long-term stability and memory leak detection",
+      "load_profile": "50 VUs for 2 hours (configurable)",
+      "duration_options": ["2h", "4h", "24h"]
+    },
+    "spike_test": {
+      "purpose": "Validate recovery from sudden load spikes",
+      "load_profile": "20 VUs → 200 VUs (10x) with recovery",
+      "spike_cycles": 3
+    }
+  },
+  "performance_targets": {
+    "throughput": {
+      "baseline": "10,000 records/min",
+      "target": "20,000+ records/min",
+      "improvement": "2x (100%)"
+    },
+    "latency_p95": {
+      "baseline": "450ms",
+      "target": "200ms",
+      "reduction": "56%"
+    },
+    "latency_p99": {
+      "baseline": "1000ms",
+      "target": "500ms"
+    },
+    "error_rate": {
+      "target": "< 1%"
+    }
   },
   "recommendations": [
-    "Continue to next agent in workflow"
+    "Run setup-test-data.sh to prepare test environment with PostgreSQL test data",
+    "Execute baseline test first to establish current metrics",
+    "Deploy optimized backend before running performance test",
+    "Use run-extraction-tests.sh to execute all tests systematically",
+    "Generate comparison report with compare-results.js to validate improvements",
+    "Monitor custom metrics: cache hits, connection pool utilization during tests",
+    "Run stress test to identify new system breaking point after optimizations",
+    "Run spike test to validate auto-scaling and recovery behavior",
+    "Run soak test (minimum 2h) before production deployment to detect memory leaks",
+    "Review detailed JSON results in load-test-results/ for deep analysis"
   ],
-  "next_steps": [],
-  "issues": []
+  "next_steps": {
+    "for_benchmarker": [
+      "Execute: ./load-tests/setup-test-data.sh",
+      "Run baseline: k6 run load-tests/extraction-baseline-test.js",
+      "Deploy optimized backend from jivs-backend-architect",
+      "Run performance: k6 run load-tests/extraction-performance-test.js",
+      "Compare: node load-tests/compare-results.js",
+      "Validate 2x throughput and 56% latency reduction achieved",
+      "Run stress/spike/soak tests for comprehensive validation",
+      "Document results and provide to workflow coordinator"
+    ]
+  },
+  "issues": [],
+  "validation": {
+    "test_files": "✓ All 5 k6 test files created",
+    "scripts": "✓ All 3 support scripts created and executable",
+    "documentation": "✓ Comprehensive README.md created",
+    "integration": "✓ Tests reference backend architect implementation",
+    "targets": "✓ Thresholds aligned with optimization plan"
+  }
 }
