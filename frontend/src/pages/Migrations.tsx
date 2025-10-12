@@ -42,6 +42,7 @@ import {
   Assessment as StatsIcon,
 } from '@mui/icons-material';
 import migrationService, { Migration, MigrationConfig } from '../services/migrationService';
+import websocketService from '../services/websocket.service';
 
 const Migrations: React.FC = () => {
   const [migrations, setMigrations] = useState<Migration[]>([]);
@@ -61,6 +62,52 @@ const Migrations: React.FC = () => {
   useEffect(() => {
     loadMigrations();
   }, [page, rowsPerPage, statusFilter]);
+
+  // WebSocket connection and subscription for real-time updates
+  useEffect(() => {
+    let subscriptionKey: string | null = null;
+
+    const connectAndSubscribe = async () => {
+      try {
+        // Connect to WebSocket if not already connected
+        if (!websocketService.isConnected()) {
+          await websocketService.connect();
+        }
+
+        // Subscribe to all migration updates
+        subscriptionKey = websocketService.subscribeToAllMigrations((update) => {
+          console.log('Received migration update:', update);
+
+          // Update the migration in the list
+          setMigrations((prevMigrations) =>
+            prevMigrations.map((migration) =>
+              migration.id === update.id
+                ? {
+                    ...migration,
+                    status: update.status || migration.status,
+                    phase: update.phase || migration.phase,
+                    progress: update.progress !== undefined ? update.progress : migration.progress,
+                    recordsMigrated: update.recordsMigrated || migration.recordsMigrated,
+                    totalRecords: update.totalRecords || migration.totalRecords,
+                  }
+                : migration
+            )
+          );
+        });
+      } catch (error) {
+        console.error('Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectAndSubscribe();
+
+    // Cleanup on unmount
+    return () => {
+      if (subscriptionKey) {
+        websocketService.unsubscribe(subscriptionKey);
+      }
+    };
+  }, []);
 
   const loadMigrations = async () => {
     try {

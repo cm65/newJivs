@@ -46,6 +46,7 @@ import FilterBuilder, { FilterGroup } from '../components/FilterBuilder';
 import QuickFilters, { QuickFilter } from '../components/QuickFilters';
 import SavedViews from '../components/SavedViews';
 import { useAdvancedFilters, SortConfig } from '../hooks/useAdvancedFilters';
+import websocketService from '../services/websocket.service';
 
 const Extractions: React.FC = () => {
   const [extractions, setExtractions] = useState<Extraction[]>([]);
@@ -143,6 +144,50 @@ const Extractions: React.FC = () => {
   useEffect(() => {
     loadExtractions();
   }, [page, rowsPerPage, filters, sort]);
+
+  // WebSocket connection and subscription for real-time updates
+  useEffect(() => {
+    let subscriptionKey: string | null = null;
+
+    const connectAndSubscribe = async () => {
+      try {
+        // Connect to WebSocket if not already connected
+        if (!websocketService.isConnected()) {
+          await websocketService.connect();
+        }
+
+        // Subscribe to all extraction updates
+        subscriptionKey = websocketService.subscribeToAllExtractions((update) => {
+          console.log('Received extraction update:', update);
+
+          // Update the extraction in the list
+          setExtractions((prevExtractions) =>
+            prevExtractions.map((extraction) =>
+              extraction.id === update.id
+                ? {
+                    ...extraction,
+                    status: update.status || extraction.status,
+                    recordsExtracted: update.recordsExtracted || extraction.recordsExtracted,
+                    progress: update.progress || extraction.progress,
+                  }
+                : extraction
+            )
+          );
+        });
+      } catch (error) {
+        console.error('Failed to connect to WebSocket:', error);
+      }
+    };
+
+    connectAndSubscribe();
+
+    // Cleanup on unmount
+    return () => {
+      if (subscriptionKey) {
+        websocketService.unsubscribe(subscriptionKey);
+      }
+    };
+  }, []);
 
   const loadExtractions = async () => {
     try {
