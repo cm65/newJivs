@@ -7,7 +7,7 @@ prioritization
 planning
 
 ## Context & Inputs
-Feature request: Code Quality Refactoring Initiative - Reduce code duplication by 50%
+Feature request: Advanced Filtering and Sorting - Dynamic filters with saved views
 
 ## Previous Agent Outputs
 {

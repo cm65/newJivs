@@ -1,8 +1,8 @@
 {
-  "workflow_id": "625A8671-9C54-4797-B5F2-82D1F7DD4856",
-  "scenario": "Advanced Filtering and Sorting - Dynamic filters with saved views",
+  "workflow_id": "3AAFB611-703A-4F9E-BF01-F52491D06B04",
+  "scenario": "Bulk Operations - Multi-select and bulk actions for extractions and migrations",
   "mode": "development",
-  "start_time": "2025-10-12T13:54:28Z",
+  "start_time": "2025-10-12T13:54:08Z",
   "status": "in_progress",
   "current_phase": "planning",
   "completed_phases": [],

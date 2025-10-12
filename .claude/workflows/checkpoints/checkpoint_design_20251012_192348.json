@@ -1,0 +1,13 @@
+{
+  "workflow_id": "813F09CC-4A3E-4D17-B580-D9D766726040",
+  "scenario": "Real-time Updates with WebSocket - Live status updates for extractions and migrations",
+  "mode": "full",
+  "start_time": "2025-10-12T13:53:48Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}
