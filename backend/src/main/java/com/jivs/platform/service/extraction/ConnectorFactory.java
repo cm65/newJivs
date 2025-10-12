@@ -3,6 +3,7 @@ package com.jivs.platform.service.extraction;
 import com.jivs.platform.common.exception.BusinessException;
 import com.jivs.platform.common.util.CryptoUtil;
 import com.jivs.platform.domain.extraction.DataSource;
+import com.jivs.platform.security.SqlInjectionValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,7 @@ public class ConnectorFactory {
 
     private final CryptoUtil cryptoUtil;
     private final ExtractionDataSourcePool dataSourcePool;
+    private final SqlInjectionValidator sqlInjectionValidator;
 
     /**
      * Get connector for data source with connection pooling
@@ -34,7 +36,8 @@ public class ConnectorFactory {
             case ORACLE:
             case SQL_SERVER:
                 // P0.2: Use pooled JDBC connector for better performance
-                return new PooledJdbcConnector(dataSourcePool, dataSource);
+                // SEC-001: Pass SQL injection validator for security
+                return new PooledJdbcConnector(dataSourcePool, dataSource, sqlInjectionValidator);
 
             case SAP:
                 return new SapConnector(

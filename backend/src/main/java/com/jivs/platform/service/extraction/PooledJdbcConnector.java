@@ -1,7 +1,11 @@
 package com.jivs.platform.service.extraction;
 
 import com.jivs.platform.domain.extraction.DataSource;
+import com.jivs.platform.security.SqlInjectionValidator;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -41,10 +45,14 @@ public class PooledJdbcConnector implements DataConnector {
 
     private final ExtractionDataSourcePool dataSourcePool;
     private final DataSource dataSource;
+    private final SqlInjectionValidator sqlInjectionValidator;
 
-    public PooledJdbcConnector(ExtractionDataSourcePool dataSourcePool, DataSource dataSource) {
+    public PooledJdbcConnector(ExtractionDataSourcePool dataSourcePool,
+                               DataSource dataSource,
+                               SqlInjectionValidator sqlInjectionValidator) {
         this.dataSourcePool = dataSourcePool;
         this.dataSource = dataSource;
+        this.sqlInjectionValidator = sqlInjectionValidator;
     }
 
     @Override
@@ -77,7 +85,13 @@ public class PooledJdbcConnector implements DataConnector {
             String query = parameters.getOrDefault("query", "SELECT 1");
             String outputPath = parameters.getOrDefault("outputPath", "/tmp/extraction");
 
-            // TODO: Re-enable SQL injection validation when security module is restored
+            // SEC-001 FIX: SQL injection validation
+            if (!sqlInjectionValidator.isQuerySafe(query)) {
+                throw new SecurityException("Query failed SQL injection validation: " + query);
+            }
+
+            // SEC-003 FIX: Path traversal validation
+            validateOutputPath(outputPath);
 
             PreparedStatement statement = connection.prepareStatement(query);
 
@@ -196,6 +210,40 @@ public class PooledJdbcConnector implements DataConnector {
 
         // Placeholder for batch write operation
         // In production, this would write to storage systems
+    }
+
+    /**
+     * SEC-003 FIX: Validate output path to prevent path traversal attacks
+     *
+     * @param outputPath The output path to validate
+     * @throws SecurityException if path is unsafe
+     */
+    private void validateOutputPath(String outputPath) {
+        if (outputPath == null || outputPath.trim().isEmpty()) {
+            throw new SecurityException("Output path cannot be null or empty");
+        }
+
+        // Normalize the path to resolve any .. or . components
+        Path normalizedPath = Paths.get(outputPath).normalize();
+        String normalizedPathStr = normalizedPath.toString();
+
+        // Check for path traversal attempts
+        if (normalizedPathStr.contains("..")) {
+            throw new SecurityException("Path traversal detected in output path: " + outputPath);
+        }
+
+        // Check for absolute path requirements (should be within /tmp or /data)
+        File file = new File(normalizedPathStr);
+        if (file.isAbsolute()) {
+            String absolutePath = file.getAbsolutePath();
+            if (!absolutePath.startsWith("/tmp") &&
+                !absolutePath.startsWith("/data") &&
+                !absolutePath.startsWith("/var/lib/jivs")) {
+                throw new SecurityException("Output path must be within allowed directories: " + outputPath);
+            }
+        }
+
+        log.debug("Output path validated: {}", normalizedPathStr);
     }
 
     @Override
