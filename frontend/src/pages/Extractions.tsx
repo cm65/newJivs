@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -45,6 +46,7 @@ import extractionService, { Extraction, ExtractionConfig } from '../services/ext
 import FilterBuilder, { FilterGroup } from '../components/FilterBuilder';
 import QuickFilters, { QuickFilter } from '../components/QuickFilters';
 import SavedViews from '../components/SavedViews';
+import BulkOperationsToolbar from '../components/BulkOperationsToolbar';
 import { useAdvancedFilters, SortConfig } from '../hooks/useAdvancedFilters';
 import websocketService from '../services/websocket.service';
 
@@ -62,6 +64,7 @@ const Extractions: React.FC = () => {
     connectionConfig: {},
   });
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | undefined>();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Advanced filters and sorting
   const { filters, sort, setFilters, setSort, clearFilters, clearSort } =
@@ -324,6 +327,60 @@ const Extractions: React.FC = () => {
     }
   };
 
+  // Bulk operations handlers
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedIds(extractions.map((e) => e.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkStart = async (ids: string[]) => {
+    try {
+      await extractionService.bulkStart(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to start selected extractions');
+    }
+  };
+
+  const handleBulkStop = async (ids: string[]) => {
+    try {
+      await extractionService.bulkStop(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to stop selected extractions');
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      await extractionService.bulkDelete(ids);
+      setSelectedIds([]);
+      loadExtractions();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete selected extractions');
+    }
+  };
+
+  const handleBulkExport = async (ids: string[]) => {
+    try {
+      await extractionService.bulkExport(ids);
+      setSelectedIds([]);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to export selected extractions');
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
@@ -437,11 +494,51 @@ const Extractions: React.FC = () => {
         )}
       </Box>
 
+      {/* Bulk Operations Toolbar */}
+      {selectedIds.length > 0 && (
+        <BulkOperationsToolbar
+          selectedIds={selectedIds}
+          actions={[
+            {
+              id: 'start',
+              label: 'Start',
+              icon: <PlayIcon />,
+              color: 'primary',
+              onExecute: handleBulkStart,
+            },
+            {
+              id: 'stop',
+              label: 'Stop',
+              icon: <StopIcon />,
+              color: 'warning',
+              confirmMessage: 'Are you sure you want to stop the selected extractions?',
+              onExecute: handleBulkStop,
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              icon: <DeleteIcon />,
+              color: 'error',
+              confirmMessage: 'Are you sure you want to delete the selected extractions? This action cannot be undone.',
+              onExecute: handleBulkDelete,
+            },
+          ]}
+          onClearSelection={() => setSelectedIds([])}
+        />
+      )}
+
       {/* Table */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={selectedIds.length > 0 && selectedIds.length < extractions.length}
+                  checked={extractions.length > 0 && selectedIds.length === extractions.length}
+                  onChange={handleSelectAll}
+                />
+              </TableCell>
               <TableCell>
                 <TableSortLabel
                   active={getSortDirection('name') !== false}
@@ -519,13 +616,13 @@ const Extractions: React.FC = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : extractions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography variant="body2" color="text.secondary">
                     No extractions found
                   </Typography>
@@ -534,6 +631,12 @@ const Extractions: React.FC = () => {
             ) : (
               extractions.map((extraction) => (
                 <TableRow key={extraction.id} hover>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.includes(extraction.id)}
+                      onChange={() => handleSelectOne(extraction.id)}
+                    />
+                  </TableCell>
                   <TableCell>{extraction.name}</TableCell>
                   <TableCell>{extraction.sourceType || 'N/A'}</TableCell>
                   <TableCell>
