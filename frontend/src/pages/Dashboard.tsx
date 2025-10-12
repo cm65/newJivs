@@ -243,8 +243,6 @@ const Dashboard: React.FC = () => {
                 <ResponsiveContainer
                   width="100%"
                   height={300}
-                  role="img"
-                  aria-label="Extraction jobs trend over 6 months"
                 >
                   <LineChart data={extractionData}>
                     <CartesianGrid
@@ -317,8 +315,6 @@ const Dashboard: React.FC = () => {
                 <ResponsiveContainer
                   width="100%"
                   height={300}
-                  role="img"
-                  aria-label="Migration status distribution"
                 >
                   <PieChart>
                     <Pie

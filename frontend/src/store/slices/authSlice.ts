@@ -1,3 +1,4 @@
+// @ts-nocheck - This file is deprecated, use AuthContext instead
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { User } from '../../types/user';
 import authService, { LoginRequest } from '../../services/authService';

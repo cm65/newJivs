@@ -6,6 +6,7 @@ export interface Extraction {
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'STOPPED';
   sourceType: string;
   recordsExtracted: number;
+  progress?: number; // Optional progress percentage (0-100)
   createdAt: string;
   updatedAt: string;
 }
