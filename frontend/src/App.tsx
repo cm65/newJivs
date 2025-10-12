@@ -25,6 +25,8 @@ import BusinessObjects from './pages/BusinessObjects';
 import Documents from './pages/Documents';
 import Settings from './pages/Settings';
 import Analytics from './pages/Analytics';
+import Notifications from './pages/Notifications';
+import Profile from './pages/Profile';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,7 +67,9 @@ function App() {
                   <Route path="/business-objects" element={<BusinessObjects />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/settings/profile" element={<Profile />} />
                   <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/notifications" element={<Notifications />} />
                 </Route>
 
                 {/* Default Route */}

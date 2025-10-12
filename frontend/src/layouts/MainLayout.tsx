@@ -85,6 +85,8 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/settings': 'Settings',
   '/settings/profile': 'Profile',
   '/settings/security': 'Security',
+  '/notifications': 'Notifications',
+  '/analytics': 'Analytics',
 };
 
 const MainLayout: React.FC = () => {
