@@ -1,13 +1,13 @@
-# Agent Task: jivs-test-results-analyzer
+# Agent Task: jivs-compliance-checker
 
 ## Task Type
-quality_analysis
+compliance_validation
 
 ## Phase
-testing
+compliance
 
 ## Context & Inputs
-Analyze all test results
+Validate GDPR/CCPA compliance
 
 ## Previous Agent Outputs
 {
@@ -30,8 +30,8 @@ Generate structured output that will be consumed by downstream agents.
 ## Output Format
 Provide output in JSON format with the following structure:
 {
-  "agent": "jivs-test-results-analyzer",
-  "task_type": "quality_analysis",
+  "agent": "jivs-compliance-checker",
+  "task_type": "compliance_validation",
   "status": "success|failure",
   "outputs": {
     // Agent-specific outputs

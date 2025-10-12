@@ -1,25 +1,22 @@
-# Agent Task: jivs-api-tester
+# Agent Task: jivs-analytics-reporter
 
 ## Task Type
-api_testing
+analytics_setup
 
 ## Phase
-testing
+operations
 
 ## Context & Inputs
-Test all API endpoints
+Setup analytics
 
 ## Previous Agent Outputs
 {
-  "phase": "testing",
+  "phase": "compliance",
   "outputs": {
-    "test_coverage": "85%",
-    "unit_tests_passing": "100%",
-    "integration_tests_passing": "98%",
-    "api_test_results": "All endpoints returning 200 OK",
-    "performance_metrics": "p95 latency: 120ms, p99: 280ms",
-    "quality_score": "92/100",
-    "go_no_go_decision": "GO - All quality gates passed"
+    "compliance_report": "GDPR: COMPLIANT, CCPA: COMPLIANT",
+    "audit_trail": "Complete audit logging implemented",
+    "security_issues": "0 CRITICAL, 0 HIGH, 2 MEDIUM, 5 LOW",
+    "compliance_approval": "APPROVED"
   }
 }
 
@@ -30,8 +27,8 @@ Generate structured output that will be consumed by downstream agents.
 ## Output Format
 Provide output in JSON format with the following structure:
 {
-  "agent": "jivs-api-tester",
-  "task_type": "api_testing",
+  "agent": "jivs-analytics-reporter",
+  "task_type": "analytics_setup",
   "status": "success|failure",
   "outputs": {
     // Agent-specific outputs

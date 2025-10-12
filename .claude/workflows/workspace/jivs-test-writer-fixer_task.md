@@ -11,13 +11,15 @@ Create comprehensive tests
 
 ## Previous Agent Outputs
 {
-  "phase": "design",
+  "phase": "testing",
   "outputs": {
-    "service_design": "Spring Boot service with controllers, services, repositories",
-    "api_endpoints": ["/api/v1/feature", "/api/v1/feature/{id}"],
-    "database_schema": "feature_table with columns: id, name, data, created_at",
-    "component_design": "React components: FeatureList, FeatureDetail, FeatureForm",
-    "redux_slices": "featureSlice with CRUD operations"
+    "test_coverage": "85%",
+    "unit_tests_passing": "100%",
+    "integration_tests_passing": "98%",
+    "api_test_results": "All endpoints returning 200 OK",
+    "performance_metrics": "p95 latency: 120ms, p99: 280ms",
+    "quality_score": "92/100",
+    "go_no_go_decision": "GO - All quality gates passed"
   }
 }
 

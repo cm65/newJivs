@@ -1,0 +1,15 @@
+{
+  "agent": "jivs-compliance-checker",
+  "task_type": "compliance_validation",
+  "phase": "compliance",
+  "status": "success",
+  "execution_time": "45s",
+  "outputs": {
+    "summary": "Agent jivs-compliance-checker completed compliance_validation successfully"
+  },
+  "recommendations": [
+    "Continue to next agent in workflow"
+  ],
+  "next_steps": [],
+  "issues": []
+}

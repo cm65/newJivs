@@ -1,0 +1,15 @@
+{
+  "agent": "jivs-analytics-reporter",
+  "task_type": "analytics_setup",
+  "phase": "operations",
+  "status": "success",
+  "execution_time": "45s",
+  "outputs": {
+    "summary": "Agent jivs-analytics-reporter completed analytics_setup successfully"
+  },
+  "recommendations": [
+    "Continue to next agent in workflow"
+  ],
+  "next_steps": [],
+  "issues": []
+}
