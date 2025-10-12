@@ -31,7 +31,7 @@ class WebSocketService {
 
     return new Promise((resolve, reject) => {
       const token = localStorage.getItem('accessToken');
-      const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:8080/ws';
+      const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws';
 
       this.client = new Client({
         webSocketFactory: () => new SockJS(wsUrl) as any,
@@ -39,7 +39,7 @@ class WebSocketService {
           Authorization: `Bearer ${token}`,
         },
         debug: (str) => {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.log('[STOMP Debug]', str);
           }
         },
