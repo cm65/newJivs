@@ -1,0 +1,15 @@
+{
+  "agent": "jivs-test-results-analyzer",
+  "task_type": "quality_analysis",
+  "phase": "testing",
+  "status": "success",
+  "execution_time": "45s",
+  "outputs": {
+    "summary": "Agent jivs-test-results-analyzer completed quality_analysis successfully"
+  },
+  "recommendations": [
+    "Continue to next agent in workflow"
+  ],
+  "next_steps": [],
+  "issues": []
+}

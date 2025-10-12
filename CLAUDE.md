@@ -2282,10 +2282,537 @@ All agents are customized for JiVS with:
 **Customization**: 100% JiVS-specific
 **Status**: Production-ready
 
+## Agent Workflow Orchestration System (January 2025)
+
+### Overview
+
+The JiVS platform includes an advanced workflow orchestration system that enables all 13 agents to work together seamlessly across the entire feature development lifecycle. The workflow system ensures agents execute in the correct sequence, pass context between each other, and validate quality gates before proceeding.
+
+**Location**: `.claude/workflows/`
+
+**Key Features**:
+- 7-phase development lifecycle automation
+- Agent-to-agent context passing
+- Quality gate validation
+- Parallel agent execution where possible
+- Comprehensive reporting
+
+### Workflow Architecture
+
+#### Workflow Phases
+
+The workflow orchestrator executes agents across 7 phases:
+
+```
+Phase 1: Planning & Prioritization
+└─ jivs-sprint-prioritizer → Sprint plan, priorities, acceptance criteria
+
+Phase 2: Design & Architecture
+├─ jivs-backend-architect → Service design, API endpoints, database schema
+└─ jivs-frontend-developer → Components, Redux slices, UI mockups
+
+Phase 3: Infrastructure Setup
+└─ jivs-devops-automator → K8s manifests, CI/CD pipeline, monitoring
+
+Phase 4: Testing & Quality Assurance
+├─ jivs-test-writer-fixer → Unit, integration, E2E tests
+├─ jivs-api-tester → Load tests, contract tests, performance
+├─ jivs-performance-benchmarker → Profiling, bottleneck analysis
+└─ jivs-test-results-analyzer → Quality score, GO/NO-GO decision
+
+Phase 5: Compliance & Security
+└─ jivs-compliance-checker → GDPR/CCPA validation, audit trail
+
+Phase 6: Operations & Monitoring
+├─ jivs-infrastructure-maintainer → Monitoring setup, health checks
+├─ jivs-analytics-reporter → Dashboards, reports, export
+└─ jivs-workflow-optimizer → Process optimization, velocity metrics
+
+Phase 7: Release & Deployment
+└─ jivs-project-shipper → Release plan, deployment, customer communication
+```
+
+#### Data Flow Between Agents
+
+**Context Passing Example**:
+```
+jivs-sprint-prioritizer
+  ↓ (sprint_plan, acceptance_criteria)
+jivs-backend-architect
+  ↓ (api_endpoints, database_schema)
+jivs-frontend-developer
+  ↓ (component_design)
+jivs-test-writer-fixer
+  ↓ (test_coverage_report)
+jivs-test-results-analyzer
+  ↓ (quality_score, GO/NO-GO)
+jivs-project-shipper
+  ↓ (release_completed)
+```
+
+### Workflow Configuration
+
+**Location**: `.claude/workflows/jivs-feature-workflow.yml`
+
+**Key Sections**:
+- **Execution Modes**: Full, Development, Deployment, Quality
+- **Phase Definitions**: 7 phases with agent assignments
+- **Data Flow**: Context passed between phases
+- **Quality Gates**: Testing and compliance gates
+- **Parallel Execution**: Agents that can run concurrently
+
+#### Execution Modes
+
+**1. Full Mode** (all 7 phases):
+```bash
+./workflow-orchestrator.sh --mode full --scenario "GDPR Data Erasure API"
+```
+- Use for: Complete features requiring full lifecycle
+- Duration: ~4-6 hours
+- Agents: All 13 agents
+
+**2. Development Mode** (3 phases: planning, design, testing):
+```bash
+./workflow-orchestrator.sh --mode development --scenario "Dark Mode UI"
+```
+- Use for: Frontend features, UI enhancements
+- Duration: ~1-2 hours
+- Agents: 5 agents (prioritizer, backend, frontend, test-writer, analyzer)
+
+**3. Deployment Mode** (3 phases: infrastructure, compliance, release):
+```bash
+./workflow-orchestrator.sh --mode deployment --scenario "Kubernetes Multi-Region"
+```
+- Use for: Infrastructure changes, deployment automation
+- Duration: ~2-3 hours
+- Agents: 3 agents (devops, compliance, shipper)
+
+**4. Quality Mode** (3 phases: testing, compliance, operations):
+```bash
+./workflow-orchestrator.sh --mode quality --scenario "Performance Optimization"
+```
+- Use for: Performance improvements, quality initiatives
+- Duration: ~2-3 hours
+- Agents: 8 agents (all testing + compliance + operations)
+
+### Workflow Orchestrator
+
+**Location**: `.claude/workflows/workflow-orchestrator.sh`
+
+**Features**:
+- Bash-based orchestration script
+- Workflow state management (JSON)
+- Checkpoint creation for resume
+- Quality gate validation
+- Error handling and retry logic
+- Comprehensive reporting
+
+#### Usage Examples
+
+**Execute Full Workflow**:
+```bash
+cd .claude/workflows
+./workflow-orchestrator.sh --mode full --scenario "New GDPR Feature"
+```
+
+**Resume from Checkpoint**:
+```bash
+./workflow-orchestrator.sh --resume checkpoints/checkpoint_testing_20250112_143022.json
+```
+
+**List Available Scenarios**:
+```bash
+./workflow-orchestrator.sh --list-scenarios
+```
+
+**Help**:
+```bash
+./workflow-orchestrator.sh --help
+```
+
+### Example Scenarios
+
+Three complete workflow scenarios are provided:
+
+#### Scenario 1: GDPR Data Erasure API
+**Location**: `.claude/workflows/scenarios/scenario-1-gdpr-erasure.md`
+
+**Overview**: Implement GDPR Article 17 (Right to Erasure) functionality
+
+**Key Requirements**:
+- Multi-system data discovery
+- Complete data deletion with audit trail
+- User confirmation via email
+- Full compliance validation
+
+**Workflow Mode**: `full` (all 7 phases)
+**Estimated Time**: 8 days development
+**Agents Involved**: All 13 agents
+
+**Expected Outputs**:
+- New `DataErasureService` with multi-system orchestration
+- REST API endpoints for erasure requests
+- Database tables: `data_erasure_requests`, `erasure_audit_trail`
+- Frontend: DataErasureRequests page with Material-UI
+- Complete test suite (unit, integration, E2E)
+- Compliance validation report
+- Performance benchmarks (<5s processing time)
+
+**Quality Gates**:
+- Test coverage: ≥85%
+- All tests passing: 100%
+- GDPR Article 17: COMPLIANT
+- Security scan: No CRITICAL issues
+
+**Command**:
+```bash
+./workflow-orchestrator.sh --mode full --scenario "GDPR Data Erasure API"
+```
+
+#### Scenario 2: Extraction Service Performance Optimization
+**Location**: `.claude/workflows/scenarios/scenario-2-performance-optimization.md`
+
+**Overview**: Optimize extraction query performance by 50%
+
+**Key Requirements**:
+- Database query optimization (add indexes)
+- Connection pool tuning (10 → 50 connections)
+- Batch processing implementation
+- Redis caching strategy
+- Thread pool optimization
+
+**Workflow Mode**: `quality` (testing, compliance, operations)
+**Estimated Time**: 5 days
+**Agents Involved**: 8 agents (testing + compliance + operations)
+
+**Expected Outputs**:
+- Database indexes on extraction tables
+- HikariCP configuration tuned
+- Batch processing with `BatchPreparedStatementSetter`
+- Redis caching with `@Cacheable`
+- Thread pool with 20 core / 50 max threads
+
+**Performance Improvements**:
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Throughput | 10k rec/min | 22k rec/min | +120% |
+| API latency p95 | 450ms | 180ms | -60% |
+| Query time p95 | 200ms | 45ms | -77% |
+
+**Quality Gates**:
+- Throughput: ≥20,000 records/minute
+- API latency p95: <200ms
+- Load test: 100 concurrent users, 30 min
+- No performance regression
+
+**Command**:
+```bash
+./workflow-orchestrator.sh --mode quality --scenario "Extraction Performance Optimization"
+```
+
+#### Scenario 3: Dark Mode UI Feature
+**Location**: `.claude/workflows/scenarios/scenario-3-dark-mode-ui.md`
+
+**Overview**: Add dark mode theme toggle to all pages
+
+**Key Requirements**:
+- Material-UI light + dark themes
+- Theme toggle button in app bar
+- User preference persistence (localStorage + backend)
+- System preference detection
+- All components support dark mode
+
+**Workflow Mode**: `development` (planning, design, testing)
+**Estimated Time**: 3 days
+**Agents Involved**: 5 agents (planning, backend, frontend, testing)
+
+**Expected Outputs**:
+- `ThemeContext` provider with light/dark themes
+- `ThemeToggle` component with smooth transitions
+- `user_preferences` database table
+- Backend API: `GET/PUT /api/v1/preferences/theme`
+- All 7 pages updated to support dark mode
+- Recharts dark mode color variants
+
+**Quality Gates**:
+- All pages render correctly in both modes
+- Theme persists across sessions
+- Smooth transition animation (300ms)
+- All tests passing
+
+**Command**:
+```bash
+./workflow-orchestrator.sh --mode development --scenario "Dark Mode UI Feature"
+```
+
+### Quality Gates
+
+Quality gates prevent workflow progression if critical criteria are not met.
+
+#### Testing Phase Gate
+**Criteria**:
+- Test coverage: >80%
+- Unit test pass rate: 100%
+- Integration test pass rate: >95%
+- No P0 bugs
+- Performance targets met
+
+**On Failure**: Halt workflow, notify team
+
+#### Compliance Phase Gate
+**Criteria**:
+- GDPR compliant: true
+- CCPA compliant: true
+- No CRITICAL security issues
+- Audit trail complete
+
+**On Failure**: Halt workflow, require compliance review
+
+#### Operations Phase Gate
+**Criteria**:
+- All health checks passing
+- Monitoring configured
+- Backups verified
+
+**On Failure**: Halt workflow, fix infrastructure
+
+### Workflow State Management
+
+**State File**: `.claude/workflows/workspace/workflow_state.json`
+
+**Structure**:
+```json
+{
+  "workflow_id": "uuid",
+  "scenario": "Feature Name",
+  "mode": "full",
+  "start_time": "2025-01-12T10:30:00Z",
+  "status": "in_progress",
+  "current_phase": "testing",
+  "completed_phases": ["planning", "design", "infrastructure"],
+  "phase_results": {
+    "planning": { "sprint_plan": "...", "priorities": [...] },
+    "design": { "api_endpoints": [...], "components": [...] }
+  },
+  "agent_outputs": {
+    "jivs-backend-architect": { "status": "success", "outputs": {...} }
+  },
+  "quality_gates": {
+    "testing": "PASSED",
+    "compliance": "PENDING"
+  }
+}
+```
+
+### Checkpoints and Resume
+
+**Checkpoint Creation**:
+- Automatically saved after each phase
+- Location: `.claude/workflows/checkpoints/`
+- Format: `checkpoint_{phase}_{timestamp}.json`
+
+**Resume from Checkpoint**:
+```bash
+./workflow-orchestrator.sh --resume checkpoints/checkpoint_testing_20250112_143022.json
+```
+
+### Workflow Reporting
+
+**Report Generation**:
+After workflow completion, a comprehensive Markdown report is generated:
+
+**Location**: `.claude/workflows/workspace/workflow_report_{timestamp}.md`
+
+**Report Sections**:
+1. Workflow summary (ID, scenario, mode, duration)
+2. Phase execution summary (all phases)
+3. Agent execution results
+4. Quality metrics (coverage, latency, compliance)
+5. Quality gate results
+6. Recommendations
+7. Next steps
+
+**Example Report Output**:
+```markdown
+# JiVS Agent Workflow Report
+
+**Workflow ID**: 4f6ae47e-883f-4e10-9cae-80bac859588a
+**Scenario**: GDPR Data Erasure API
+**Mode**: full
+**Status**: ✅ COMPLETED
+
+## Phase Execution Summary
+
+### Phase 1: Planning & Prioritization
+- ✅ jivs-sprint-prioritizer
+- Outputs: Sprint plan, feature priorities, acceptance criteria
+
+### Phase 4: Testing & Quality Assurance
+- ✅ jivs-test-writer-fixer
+- ✅ jivs-api-tester
+- ✅ jivs-performance-benchmarker
+- ✅ jivs-test-results-analyzer
+- Quality Gate: ✅ PASSED
+
+## Quality Metrics
+- Test Coverage: 85%
+- API Latency (p95): 120ms
+- Compliance Score: 100%
+- Quality Score: 92/100
+
+## Recommendations
+1. Monitor performance metrics post-deployment
+2. Address 2 MEDIUM security issues in next sprint
+```
+
+### Parallel Agent Execution
+
+Some agents can execute in parallel for faster workflow completion:
+
+**Phase 2 (Design)**:
+- `jivs-backend-architect` and `jivs-frontend-developer` run in parallel
+- Sync point: Frontend waits for backend API endpoints
+
+**Phase 4 (Testing)**:
+- `jivs-test-writer-fixer`, `jivs-api-tester`, `jivs-performance-benchmarker` run in parallel
+- Sync point: All feed results into `jivs-test-results-analyzer`
+
+**Phase 6 (Operations)**:
+- `jivs-infrastructure-maintainer` and `jivs-analytics-reporter` run in parallel
+- Sync point: Monitoring complete
+
+### Error Handling
+
+**Agent Failure**:
+- Retry with context (max 2 retries)
+- Log error details
+- Save checkpoint before retry
+
+**Quality Gate Failure**:
+- Halt workflow immediately
+- Notify team (Slack, email)
+- Generate failure report
+
+**Workflow Interruption**:
+- Save checkpoint automatically
+- Resume from last completed phase
+
+### Integration with CI/CD
+
+The workflow orchestrator can be integrated into CI/CD pipelines:
+
+**GitHub Actions Integration**:
+```yaml
+- name: Run Feature Workflow
+  run: |
+    cd .claude/workflows
+    ./workflow-orchestrator.sh --mode full --scenario "${{ inputs.feature_name }}"
+```
+
+**Jenkins Integration**:
+```groovy
+stage('Agent Workflow') {
+  steps {
+    sh '.claude/workflows/workflow-orchestrator.sh --mode quality --scenario "Performance Test"'
+  }
+}
+```
+
+### Workflow Metrics
+
+**Tracked Metrics**:
+- **Workflow Execution Time**: Total duration by mode
+- **Phase Execution Times**: Per-phase duration
+- **Agent Execution Times**: Per-agent duration
+- **Quality Gate Pass Rate**: % of successful gates
+- **Workflow Success Rate**: % of completed workflows
+
+**Expected Performance**:
+- Full workflow: 4-6 hours
+- Development workflow: 1-2 hours
+- Quality workflow: 2-3 hours
+- Deployment workflow: 2-3 hours
+
+### Customization
+
+**Add New Scenario**:
+1. Create scenario file: `.claude/workflows/scenarios/scenario-{name}.md`
+2. Define requirements, acceptance criteria, expected outputs
+3. Specify workflow mode and agents involved
+4. Document quality gates
+
+**Modify Workflow Phases**:
+1. Edit `.claude/workflows/jivs-feature-workflow.yml`
+2. Update `phases` section
+3. Adjust `data_flow` for context passing
+4. Update quality gates as needed
+
+**Add Custom Quality Gate**:
+```yaml
+quality_gates:
+  - phase: custom_phase
+    gate: custom_gate_name
+    criteria:
+      - metric: ">threshold"
+    on_failure: "halt_workflow"
+```
+
+### Best Practices
+
+**When to Use Workflows**:
+- ✅ Multi-phase features (GDPR compliance, new modules)
+- ✅ Performance optimization initiatives
+- ✅ Infrastructure changes requiring validation
+- ✅ Features requiring full quality assurance
+- ❌ Simple bug fixes (use agents individually)
+- ❌ Documentation updates (manual)
+
+**Workflow Tips**:
+1. Always start with scenario definition
+2. Choose appropriate execution mode
+3. Review quality gates before starting
+4. Monitor workflow progress actively
+5. Save checkpoints frequently
+6. Review final report thoroughly
+
+### Troubleshooting
+
+**Issue: Workflow hangs at quality gate**
+- **Cause**: Quality criteria not met
+- **Solution**: Check quality gate logs, fix issues, restart from checkpoint
+
+**Issue: Agent execution fails repeatedly**
+- **Cause**: Invalid inputs or missing dependencies
+- **Solution**: Review agent task file, verify context data
+
+**Issue: Workflow state corrupted**
+- **Cause**: Manual file edits or system crash
+- **Solution**: Restore from last checkpoint
+
+### Future Enhancements
+
+**Planned Features**:
+1. Web UI for workflow monitoring
+2. Real-time progress visualization
+3. Slack/Teams notifications at each phase
+4. Automatic issue creation on quality gate failure
+5. Workflow templates for common patterns
+6. Agent output caching for faster re-runs
+7. Distributed workflow execution (multi-machine)
+8. Integration with Jira for sprint tracking
+
+---
+
+**Workflow System Created**: January 2025
+**Workflow Modes**: 4 (Full, Development, Deployment, Quality)
+**Example Scenarios**: 3 (GDPR, Performance, UI)
+**Quality Gates**: 3 (Testing, Compliance, Operations)
+**Status**: Production-ready
+
 ---
 
 **Last Updated**: January 12, 2025
 **Version**: 1.0.1
-**Git Commit**: 69dc6d4
+**Git Commit**: 93cf673
 **Tested By**: Claude AI
 **Status**: Fully Functional

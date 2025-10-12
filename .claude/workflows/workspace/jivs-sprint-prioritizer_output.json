@@ -1,0 +1,15 @@
+{
+  "agent": "jivs-sprint-prioritizer",
+  "task_type": "prioritization",
+  "phase": "planning",
+  "status": "success",
+  "execution_time": "45s",
+  "outputs": {
+    "summary": "Agent jivs-sprint-prioritizer completed prioritization successfully"
+  },
+  "recommendations": [
+    "Continue to next agent in workflow"
+  ],
+  "next_steps": [],
+  "issues": []
+}

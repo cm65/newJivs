@@ -1,0 +1,476 @@
+---
+name: jivs-feature-workflow
+version: 1.0.0
+description: Comprehensive agent workflow for JiVS feature development lifecycle
+
+# Workflow Configuration
+workflow:
+  name: "Full Feature Development Lifecycle"
+  description: "End-to-end workflow orchestrating all 13 JiVS agents from planning to release"
+
+# Execution Modes
+modes:
+  - name: full
+    description: "Execute all phases sequentially"
+    phases: [planning, design, infrastructure, testing, compliance, operations, release]
+
+  - name: development
+    description: "Planning, design, and basic testing only"
+    phases: [planning, design, testing]
+
+  - name: deployment
+    description: "Infrastructure, compliance, and release only"
+    phases: [infrastructure, compliance, release]
+
+  - name: quality
+    description: "Testing, compliance, and operations validation"
+    phases: [testing, compliance, operations]
+
+# Workflow Phases
+phases:
+  # Phase 1: Planning & Prioritization
+  - id: planning
+    name: "Planning & Prioritization"
+    description: "Prioritize features and define sprint scope"
+    agents:
+      - agent: jivs-sprint-prioritizer
+        task_type: prioritization
+        inputs:
+          - type: user_input
+            required: true
+            description: "Feature requests and requirements"
+        outputs:
+          - sprint_plan
+          - feature_priorities
+          - acceptance_criteria
+        next_phase_inputs:
+          - sprint_plan → design.feature_requirements
+          - acceptance_criteria → testing.test_requirements
+
+  # Phase 2: Design & Architecture
+  - id: design
+    name: "Design & Architecture"
+    description: "Design backend and frontend architecture"
+    agents:
+      - agent: jivs-backend-architect
+        task_type: architecture
+        inputs:
+          - type: from_phase
+            phase: planning
+            field: sprint_plan
+          - type: context
+            description: "JiVS backend architecture patterns"
+        outputs:
+          - service_design
+          - api_endpoints
+          - database_schema
+          - flyway_migrations
+        next_phase_inputs:
+          - api_endpoints → testing.api_test_targets
+          - database_schema → infrastructure.database_setup
+
+      - agent: jivs-frontend-developer
+        task_type: ui_design
+        depends_on: [jivs-backend-architect]
+        inputs:
+          - type: from_agent
+            agent: jivs-backend-architect
+            field: api_endpoints
+          - type: context
+            description: "React + Material-UI patterns"
+        outputs:
+          - component_design
+          - redux_slices
+          - page_routes
+          - ui_mockups
+        next_phase_inputs:
+          - page_routes → testing.e2e_test_targets
+
+  # Phase 3: Infrastructure Setup
+  - id: infrastructure
+    name: "Infrastructure Setup"
+    description: "Configure deployment and monitoring infrastructure"
+    agents:
+      - agent: jivs-devops-automator
+        task_type: infrastructure
+        inputs:
+          - type: from_phase
+            phase: design
+            field: service_design
+          - type: from_phase
+            phase: design
+            field: database_schema
+        outputs:
+          - kubernetes_manifests
+          - ci_cd_pipeline
+          - monitoring_config
+          - backup_jobs
+        next_phase_inputs:
+          - ci_cd_pipeline → testing.automation_hooks
+          - monitoring_config → operations.monitoring_setup
+
+  # Phase 4: Testing & Quality Assurance
+  - id: testing
+    name: "Testing & Quality Assurance"
+    description: "Comprehensive testing across all layers"
+    agents:
+      - agent: jivs-test-writer-fixer
+        task_type: test_creation
+        inputs:
+          - type: from_phase
+            phase: design
+            field: service_design
+          - type: from_phase
+            phase: planning
+            field: acceptance_criteria
+        outputs:
+          - unit_tests
+          - integration_tests
+          - e2e_tests
+          - test_coverage_report
+        next_phase_inputs:
+          - test_coverage_report → quality_analysis.coverage_metrics
+
+      - agent: jivs-api-tester
+        task_type: api_testing
+        depends_on: [jivs-test-writer-fixer]
+        inputs:
+          - type: from_phase
+            phase: design
+            field: api_endpoints
+          - type: from_agent
+            agent: jivs-test-writer-fixer
+            field: integration_tests
+        outputs:
+          - api_test_results
+          - contract_test_results
+          - load_test_results
+        next_phase_inputs:
+          - api_test_results → quality_analysis.test_results
+
+      - agent: jivs-performance-benchmarker
+        task_type: performance_testing
+        depends_on: [jivs-api-tester]
+        inputs:
+          - type: from_phase
+            phase: design
+            field: api_endpoints
+          - type: from_phase
+            phase: infrastructure
+            field: kubernetes_manifests
+        outputs:
+          - performance_metrics
+          - bottleneck_analysis
+          - optimization_recommendations
+        next_phase_inputs:
+          - performance_metrics → quality_analysis.performance_data
+
+      - agent: jivs-test-results-analyzer
+        task_type: quality_analysis
+        depends_on: [jivs-test-writer-fixer, jivs-api-tester, jivs-performance-benchmarker]
+        inputs:
+          - type: from_agent
+            agent: jivs-test-writer-fixer
+            field: test_coverage_report
+          - type: from_agent
+            agent: jivs-api-tester
+            field: api_test_results
+          - type: from_agent
+            agent: jivs-performance-benchmarker
+            field: performance_metrics
+        outputs:
+          - quality_score
+          - flaky_tests
+          - quality_report
+          - go_no_go_decision
+        next_phase_inputs:
+          - go_no_go_decision → compliance.quality_gate
+          - quality_report → release.release_notes
+
+  # Phase 5: Compliance & Security
+  - id: compliance
+    name: "Compliance & Security Validation"
+    description: "Validate GDPR/CCPA compliance and security standards"
+    agents:
+      - agent: jivs-compliance-checker
+        task_type: compliance_validation
+        inputs:
+          - type: from_phase
+            phase: design
+            field: service_design
+          - type: from_phase
+            phase: testing
+            field: quality_report
+          - type: context
+            description: "GDPR/CCPA requirements"
+        outputs:
+          - compliance_report
+          - audit_trail
+          - security_issues
+          - compliance_approval
+        next_phase_inputs:
+          - compliance_approval → release.compliance_gate
+          - security_issues → operations.monitoring_alerts
+
+  # Phase 6: Operations & Monitoring
+  - id: operations
+    name: "Operations & Monitoring"
+    description: "Setup monitoring, analytics, and operational workflows"
+    agents:
+      - agent: jivs-infrastructure-maintainer
+        task_type: monitoring_setup
+        inputs:
+          - type: from_phase
+            phase: infrastructure
+            field: monitoring_config
+          - type: from_phase
+            phase: compliance
+            field: security_issues
+        outputs:
+          - prometheus_alerts
+          - grafana_dashboards
+          - backup_verification
+          - health_checks
+        next_phase_inputs:
+          - health_checks → release.deployment_validation
+
+      - agent: jivs-analytics-reporter
+        task_type: analytics_setup
+        depends_on: [jivs-infrastructure-maintainer]
+        inputs:
+          - type: from_phase
+            phase: design
+            field: service_design
+          - type: context
+            description: "JiVS analytics requirements"
+        outputs:
+          - analytics_dashboards
+          - report_templates
+          - export_functions
+        next_phase_inputs:
+          - analytics_dashboards → release.observability_setup
+
+      - agent: jivs-workflow-optimizer
+        task_type: process_optimization
+        depends_on: [jivs-infrastructure-maintainer, jivs-analytics-reporter]
+        inputs:
+          - type: from_phase
+            phase: testing
+            field: quality_report
+          - type: from_phase
+            phase: infrastructure
+            field: ci_cd_pipeline
+        outputs:
+          - optimization_recommendations
+          - velocity_metrics
+          - bottleneck_report
+        next_phase_inputs:
+          - velocity_metrics → release.sprint_metrics
+
+  # Phase 7: Release & Deployment
+  - id: release
+    name: "Release & Deployment"
+    description: "Ship feature to production with comprehensive validation"
+    agents:
+      - agent: jivs-project-shipper
+        task_type: release_management
+        inputs:
+          - type: from_phase
+            phase: testing
+            field: quality_report
+          - type: from_phase
+            phase: compliance
+            field: compliance_approval
+          - type: from_phase
+            phase: operations
+            field: health_checks
+          - type: from_phase
+            phase: planning
+            field: sprint_plan
+        outputs:
+          - release_plan
+          - deployment_checklist
+          - rollback_plan
+          - customer_communication
+          - release_metrics
+        final_outputs:
+          - release_completed
+          - post_mortem_template
+
+# Data Flow Schema
+data_flow:
+  # Context passed through entire workflow
+  global_context:
+    - jivs_architecture: "Spring Boot 3.2, React 18, PostgreSQL 15, Redis, Elasticsearch"
+    - compliance_standards: ["GDPR", "CCPA", "SOC 2"]
+    - quality_gates:
+        test_coverage: ">80%"
+        api_latency_p95: "<200ms"
+        security_scan: "no HIGH/CRITICAL"
+
+  # Phase-to-phase data transfer
+  phase_transfers:
+    - from: planning
+      to: [design, testing]
+      data: [sprint_plan, acceptance_criteria, feature_priorities]
+
+    - from: design
+      to: [infrastructure, testing, compliance, operations]
+      data: [service_design, api_endpoints, database_schema, component_design]
+
+    - from: infrastructure
+      to: [testing, operations, release]
+      data: [kubernetes_manifests, ci_cd_pipeline, monitoring_config]
+
+    - from: testing
+      to: [compliance, operations, release]
+      data: [quality_report, test_coverage_report, go_no_go_decision]
+
+    - from: compliance
+      to: [operations, release]
+      data: [compliance_approval, audit_trail, security_issues]
+
+    - from: operations
+      to: [release]
+      data: [health_checks, analytics_dashboards, velocity_metrics]
+
+# Quality Gates (prevent progression if not met)
+quality_gates:
+  - phase: testing
+    gate: test_results_analyzer_approval
+    criteria:
+      - test_coverage: ">80%"
+      - unit_test_pass_rate: "100%"
+      - integration_test_pass_rate: ">95%"
+      - no_p0_bugs: true
+    on_failure: "halt_workflow"
+
+  - phase: compliance
+    gate: compliance_checker_approval
+    criteria:
+      - gdpr_compliant: true
+      - ccpa_compliant: true
+      - no_security_critical: true
+      - audit_trail_complete: true
+    on_failure: "halt_workflow"
+
+  - phase: operations
+    gate: infrastructure_health_check
+    criteria:
+      - all_health_checks_passing: true
+      - monitoring_configured: true
+      - backups_verified: true
+    on_failure: "halt_workflow"
+
+# Workflow Execution Configuration
+execution:
+  # Parallel execution where possible
+  parallel_agents:
+    - phase: design
+      agents: [jivs-backend-architect, jivs-frontend-developer]
+      # Frontend waits for backend API design
+      sync_point: "api_endpoints_defined"
+
+    - phase: testing
+      agents: [jivs-test-writer-fixer, jivs-api-tester, jivs-performance-benchmarker]
+      # All feed into analyzer
+      sync_point: "all_tests_complete"
+
+    - phase: operations
+      agents: [jivs-infrastructure-maintainer, jivs-analytics-reporter]
+      sync_point: "monitoring_complete"
+
+  # Error handling
+  error_handling:
+    on_agent_failure: "retry_with_context"
+    max_retries: 2
+    on_quality_gate_failure: "halt_and_notify"
+    rollback_on_release_failure: true
+
+  # Notifications
+  notifications:
+    on_phase_complete: true
+    on_quality_gate: true
+    on_workflow_complete: true
+    on_error: true
+    channels: ["slack", "email"]
+
+# Example Workflow Scenarios
+scenarios:
+  - name: "New GDPR Feature: Data Erasure API"
+    mode: full
+    initial_input:
+      feature_name: "GDPR Article 17 - Right to Erasure API"
+      requirements: |
+        - User can request data deletion via API
+        - Multi-system data discovery
+        - Complete audit trail
+        - Customer notification
+      priority: P0
+      sprint: Sprint_42
+
+  - name: "Performance Optimization: Extraction Service"
+    mode: quality
+    initial_input:
+      feature_name: "Optimize Extraction Service Query Performance"
+      requirements: |
+        - Reduce extraction time by 50%
+        - Add database indexes
+        - Implement query caching
+      priority: P1
+      sprint: Sprint_43
+
+  - name: "Frontend Enhancement: Dark Mode"
+    mode: development
+    initial_input:
+      feature_name: "Add Dark Mode to JiVS UI"
+      requirements: |
+        - Material-UI theme switching
+        - User preference persistence
+        - All components support dark mode
+      priority: P2
+      sprint: Sprint_44
+
+# Metrics & Reporting
+metrics:
+  workflow_metrics:
+    - total_execution_time
+    - phase_execution_times
+    - agent_execution_times
+    - quality_gate_pass_rate
+    - workflow_success_rate
+
+  output_metrics:
+    - features_shipped
+    - bugs_prevented
+    - compliance_violations_caught
+    - performance_improvements
+    - test_coverage_achieved
+
+  efficiency_metrics:
+    - time_to_production
+    - automation_percentage
+    - manual_intervention_count
+    - rollback_rate
+
+# Workflow Documentation
+documentation:
+  usage: |
+    To run the workflow:
+
+    1. Execute full workflow:
+       ./workflow-orchestrator.sh --mode full --scenario "New Feature Name"
+
+    2. Execute specific phase:
+       ./workflow-orchestrator.sh --phase testing --context workflow_state.json
+
+    3. Resume from checkpoint:
+       ./workflow-orchestrator.sh --resume checkpoint_phase3.json
+
+  customization: |
+    To customize the workflow:
+
+    1. Modify phase sequence in 'phases' section
+    2. Add custom quality gates in 'quality_gates' section
+    3. Configure parallel execution in 'execution.parallel_agents'
+    4. Add new scenarios in 'scenarios' section

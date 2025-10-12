@@ -1,0 +1,13 @@
+{
+  "workflow_id": "2A70A160-611E-4239-AA32-DDCF13E9F4D8",
+  "scenario": "Dark Mode UI Feature",
+  "mode": "development",
+  "start_time": "2025-10-12T13:26:50Z",
+  "status": "in_progress",
+  "current_phase": "planning",
+  "completed_phases": [],
+  "phase_results": {},
+  "agent_outputs": {},
+  "quality_gates": {},
+  "errors": []
+}
