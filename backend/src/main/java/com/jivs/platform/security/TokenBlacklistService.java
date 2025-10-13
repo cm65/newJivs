@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,8 +15,10 @@ import java.util.UUID;
 /**
  * Service for blacklisting JWT tokens to prevent their use after logout or revocation.
  * Uses Redis for distributed token blacklist storage with automatic expiration.
+ * Only available when Redis is configured.
  */
 @Service
+@ConditionalOnBean(RedisTemplate.class)
 public class TokenBlacklistService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TokenBlacklistService.class);

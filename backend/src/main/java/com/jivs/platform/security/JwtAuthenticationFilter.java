@@ -5,7 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,14 +20,20 @@ import java.io.IOException;
  * JWT authentication filter for validating tokens
  */
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
-    private final TokenBlacklistService tokenBlacklistService;
+
+    @Autowired(required = false)
+    private TokenBlacklistService tokenBlacklistService;
+
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserDetailsServiceImpl userDetailsService) {
+        this.tokenProvider = tokenProvider;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -37,8 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                // Check if token is blacklisted
-                if (tokenBlacklistService.isBlacklisted(jwt)) {
+                // Check if token is blacklisted (only if TokenBlacklistService is available)
+                if (tokenBlacklistService != null && tokenBlacklistService.isBlacklisted(jwt)) {
                     log.warn("Attempted to use blacklisted token");
                     filterChain.doFilter(request, response);
                     return;
@@ -47,8 +53,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String username = tokenProvider.getUsernameFromToken(jwt);
                 String userId = tokenProvider.getUserIdFromToken(jwt);
 
-                // Check if all user tokens are blacklisted
-                if (tokenBlacklistService.isUserBlacklisted(userId, tokenProvider.getIssuedAtFromToken(jwt))) {
+                // Check if all user tokens are blacklisted (only if TokenBlacklistService is available)
+                if (tokenBlacklistService != null && tokenBlacklistService.isUserBlacklisted(userId, tokenProvider.getIssuedAtFromToken(jwt))) {
                     log.warn("Attempted to use token for user with all tokens blacklisted: {}", username);
                     filterChain.doFilter(request, response);
                     return;
