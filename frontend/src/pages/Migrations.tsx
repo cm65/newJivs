@@ -55,10 +55,12 @@ const Migrations: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newMigration, setNewMigration] = useState<Partial<MigrationConfig>>({
+  const [newMigration, setNewMigration] = useState({
     name: '',
-    sourceConfig: {},
-    targetConfig: {},
+    description: '',
+    sourceSystem: '',
+    targetSystem: '',
+    migrationType: 'FULL',
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -185,9 +187,9 @@ const Migrations: React.FC = () => {
 
   const handleCreateMigration = async () => {
     try {
-      await migrationService.createMigration(newMigration as MigrationConfig);
+      await migrationService.createMigration(newMigration as any);
       setCreateDialogOpen(false);
-      setNewMigration({ name: '', sourceConfig: {}, targetConfig: {} });
+      setNewMigration({ name: '', description: '', sourceSystem: '', targetSystem: '', migrationType: 'FULL' });
       loadMigrations();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create migration');
@@ -590,25 +592,48 @@ const Migrations: React.FC = () => {
             <TextField
               label="Name"
               fullWidth
+              required
               value={newMigration.name}
               onChange={(e) => setNewMigration({ ...newMigration, name: e.target.value })}
+              placeholder="e.g., Oracle to PostgreSQL Migration"
             />
-            <Typography variant="body2" color="text.secondary">
-              Source Configuration
-            </Typography>
             <TextField
-              label="Source Connection"
+              label="Description"
               fullWidth
-              placeholder="Enter source connection details"
+              multiline
+              rows={2}
+              value={newMigration.description}
+              onChange={(e) => setNewMigration({ ...newMigration, description: e.target.value })}
+              placeholder="Describe the migration..."
             />
-            <Typography variant="body2" color="text.secondary">
-              Target Configuration
-            </Typography>
             <TextField
-              label="Target Connection"
+              label="Source System"
               fullWidth
-              placeholder="Enter target connection details"
+              required
+              value={newMigration.sourceSystem}
+              onChange={(e) => setNewMigration({ ...newMigration, sourceSystem: e.target.value })}
+              placeholder="e.g., Oracle Database 12c"
             />
+            <TextField
+              label="Target System"
+              fullWidth
+              required
+              value={newMigration.targetSystem}
+              onChange={(e) => setNewMigration({ ...newMigration, targetSystem: e.target.value })}
+              placeholder="e.g., PostgreSQL 15"
+            />
+            <FormControl fullWidth>
+              <InputLabel>Migration Type</InputLabel>
+              <Select
+                value={newMigration.migrationType}
+                label="Migration Type"
+                onChange={(e) => setNewMigration({ ...newMigration, migrationType: e.target.value })}
+              >
+                <MenuItem value="FULL">Full Migration</MenuItem>
+                <MenuItem value="INCREMENTAL">Incremental Migration</MenuItem>
+                <MenuItem value="SNAPSHOT">Snapshot Migration</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -616,7 +641,7 @@ const Migrations: React.FC = () => {
           <Button
             onClick={handleCreateMigration}
             variant="contained"
-            disabled={!newMigration.name}
+            disabled={!newMigration.name || !newMigration.sourceSystem || !newMigration.targetSystem}
           >
             Create
           </Button>
