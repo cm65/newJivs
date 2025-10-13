@@ -2,6 +2,7 @@ package com.jivs.platform.config;
 
 import com.jivs.platform.security.WebSocketAuthInterceptor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -20,6 +21,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+
+    @Value("${jivs.security.websocket.allowed-origins}")
+    private String[] allowedOrigins;
 
     /**
      * Configure message broker for pub/sub messaging
@@ -45,16 +49,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     /**
      * Register STOMP endpoints for WebSocket connections
      * SockJS fallback enabled for browsers without WebSocket support
-     * CORS configured for localhost development
+     * Allowed origins configured via jivs.security.websocket.allowed-origins property
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns(
-                        "http://localhost:3000",
-                        "http://localhost:3001",
-                        "http://localhost:8080"
-                ) // TODO: Configure based on environment (use properties)
+                .setAllowedOriginPatterns(allowedOrigins)
                 .withSockJS(); // Enable SockJS fallback
     }
 
