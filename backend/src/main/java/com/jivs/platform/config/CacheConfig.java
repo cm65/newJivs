@@ -8,6 +8,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -31,9 +32,12 @@ import java.util.Map;
  * - Throughput: +10% (17.5k → 19.25k records/min)
  * - Latency: -50ms (270ms → 220ms)
  * - Cache hit rate target: 70%+
+ *
+ * Only loaded in non-production profiles where Redis is available
  */
 @Configuration
 @EnableCaching
+@Profile("!production")
 public class CacheConfig {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CacheConfig.class);
