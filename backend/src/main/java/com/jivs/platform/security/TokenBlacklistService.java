@@ -23,7 +23,7 @@ public class TokenBlacklistService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TokenBlacklistService.class);
 
-    @Autowired
+    @Autowired(required = false)
     private RedisTemplate<String, String> redisTemplate;
 
     @Value("${jivs.security.jwt.secret}")
@@ -37,6 +37,10 @@ public class TokenBlacklistService {
      * @param token The JWT token to blacklist
      */
     public void blacklistToken(String token) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot blacklist token");
+            return;
+        }
         try {
             String jti = extractJti(token);
             long expirationMs = getExpirationTime(token);
@@ -64,6 +68,9 @@ public class TokenBlacklistService {
      * @return true if the token is blacklisted, false otherwise
      */
     public boolean isBlacklisted(String token) {
+        if (redisTemplate == null) {
+            return false; // If Redis not available, can't check blacklist
+        }
         try {
             String jti = extractJti(token);
             Boolean hasKey = redisTemplate.hasKey(BLACKLIST_PREFIX + jti);
@@ -81,6 +88,10 @@ public class TokenBlacklistService {
      * @param userId The user ID whose tokens should be blacklisted
      */
     public void blacklistAllUserTokens(String userId) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot blacklist all user tokens for user: {}", userId);
+            return;
+        }
         try {
             // Store a user-level blacklist entry with a long expiration (7 days)
             redisTemplate.opsForValue().set(
@@ -103,6 +114,9 @@ public class TokenBlacklistService {
      * @return true if user tokens are blacklisted after the token issue time
      */
     public boolean isUserBlacklisted(String userId, Date tokenIssuedAt) {
+        if (redisTemplate == null) {
+            return false; // If Redis not available, can't check blacklist
+        }
         try {
             String blacklistTime = redisTemplate.opsForValue().get("user:blacklist:" + userId);
             if (blacklistTime != null) {
@@ -153,6 +167,10 @@ public class TokenBlacklistService {
      * Clear all blacklist entries (use with caution - for testing only)
      */
     public void clearBlacklist() {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot clear blacklist");
+            return;
+        }
         try {
             redisTemplate.keys(BLACKLIST_PREFIX + "*").forEach(key ->
                 redisTemplate.delete(key)
