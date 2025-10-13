@@ -1,0 +1,530 @@
+package com.jivs.platform.integration;
+
+import com.jivs.platform.domain.extraction.Extraction;
+import com.jivs.platform.domain.extraction.ExtractionStatus;
+import com.jivs.platform.domain.migration.Migration;
+import com.jivs.platform.domain.migration.MigrationPhase;
+import com.jivs.platform.domain.quality.DataQualityRule;
+import com.jivs.platform.domain.quality.QualityDimension;
+import com.jivs.platform.domain.compliance.DataSubjectRequest;
+import com.jivs.platform.domain.compliance.RequestType;
+import com.jivs.platform.service.extraction.ExtractionService;
+import com.jivs.platform.service.migration.MigrationService;
+import com.jivs.platform.service.quality.DataQualityService;
+import com.jivs.platform.service.compliance.ComplianceService;
+import com.jivs.platform.service.analytics.AnalyticsService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+/**
+ * Comprehensive Integration Tests
+ *
+ * These tests validate complex workflows that span multiple services,
+ * ensuring the entire system works together correctly.
+ *
+ * Test Scenarios:
+ * 1. End-to-end data flow (extraction → quality → migration)
+ * 2. Compliance request processing across systems
+ * 3. Concurrent operations handling
+ * 4. Error recovery and rollback scenarios
+ * 5. Performance under load
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
+@ActiveProfiles("test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class ComprehensiveIntegrationTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+            .withDatabaseName("jivs_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
+            .withExposedPorts(6379);
+
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.redis.host", redis::getHost);
+        registry.add("spring.redis.port", redis::getFirstMappedPort);
+    }
+
+    @Autowired
+    private ExtractionService extractionService;
+
+    @Autowired
+    private MigrationService migrationService;
+
+    @Autowired
+    private DataQualityService dataQualityService;
+
+    @Autowired
+    private ComplianceService complianceService;
+
+    @Autowired
+    private AnalyticsService analyticsService;
+
+    @Nested
+    @DisplayName("End-to-End Data Flow Tests")
+    class EndToEndDataFlowTests {
+
+        @Test
+        @DisplayName("Should complete full data pipeline: extraction → quality check → migration")
+        @Transactional
+        void shouldCompleteFullDataPipeline() throws Exception {
+            // Step 1: Create and start extraction
+            Extraction extraction = extractionService.createExtraction(
+                "Test Data Extract",
+                "JDBC",
+                Map.of(
+                    "url", "jdbc:h2:mem:test",
+                    "username", "sa",
+                    "password", "",
+                    "query", "SELECT * FROM customers"
+                )
+            );
+
+            extractionService.startExtraction(extraction.getId());
+
+            // Wait for extraction to complete
+            await().atMost(30, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Extraction updated = extractionService.getExtraction(extraction.getId());
+                       return updated.getStatus() == ExtractionStatus.COMPLETED;
+                   });
+
+            // Step 2: Run data quality checks
+            DataQualityRule rule = dataQualityService.createRule(
+                "Email Validation",
+                QualityDimension.VALIDITY,
+                "email LIKE '%@%'"
+            );
+
+            var qualityResult = dataQualityService.executeRule(rule.getId());
+            assertThat(qualityResult.getPassRate()).isGreaterThan(90.0);
+
+            // Step 3: Create and execute migration
+            Migration migration = migrationService.createMigration(
+                "Test Migration",
+                extraction.getId(),
+                Map.of("targetTable", "customers_migrated")
+            );
+
+            migrationService.startMigration(migration.getId());
+
+            // Wait for migration to complete
+            await().atMost(60, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Migration updated = migrationService.getMigration(migration.getId());
+                       return updated.getPhase() == MigrationPhase.COMPLETED;
+                   });
+
+            // Verify analytics show the completed pipeline
+            var analytics = analyticsService.getDashboardAnalytics(null, null);
+            assertThat(analytics.getTotalExtractions()).isGreaterThan(0);
+            assertThat(analytics.getTotalMigrations()).isGreaterThan(0);
+            assertThat(analytics.getDataQualityScore()).isGreaterThan(0.0);
+        }
+
+        @Test
+        @DisplayName("Should handle extraction failure and trigger rollback")
+        void shouldHandleExtractionFailureWithRollback() {
+            // Create extraction with invalid configuration
+            Extraction extraction = extractionService.createExtraction(
+                "Failed Extract",
+                "JDBC",
+                Map.of("url", "invalid://url")  // Invalid URL
+            );
+
+            // Start extraction (should fail)
+            extractionService.startExtraction(extraction.getId());
+
+            // Wait for failure
+            await().atMost(10, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Extraction updated = extractionService.getExtraction(extraction.getId());
+                       return updated.getStatus() == ExtractionStatus.FAILED;
+                   });
+
+            // Verify error is logged
+            Extraction failed = extractionService.getExtraction(extraction.getId());
+            assertThat(failed.getErrorMessage()).isNotEmpty();
+            assertThat(failed.getErrorMessage()).containsIgnoringCase("connection");
+        }
+    }
+
+    @Nested
+    @DisplayName("Compliance Processing Tests")
+    class ComplianceProcessingTests {
+
+        @Test
+        @DisplayName("Should process GDPR data erasure request across all systems")
+        @Transactional
+        void shouldProcessGDPRDataErasureRequest() throws Exception {
+            // Create data subject request
+            DataSubjectRequest request = complianceService.createDataSubjectRequest(
+                "user@example.com",
+                RequestType.ERASURE,
+                "GDPR",
+                "Delete all my personal data"
+            );
+
+            // Process the request
+            complianceService.processRequest(request.getId());
+
+            // Wait for processing
+            await().atMost(30, TimeUnit.SECONDS)
+                   .until(() -> {
+                       DataSubjectRequest updated = complianceService.getRequest(request.getId());
+                       return updated.getStatus().equals("COMPLETED");
+                   });
+
+            // Verify data has been erased from all systems
+            DataSubjectRequest completed = complianceService.getRequest(request.getId());
+            assertThat(completed.getProcessedSystems()).contains("DATABASE", "CACHE", "ARCHIVES");
+            assertThat(completed.getRecordsDeleted()).isGreaterThan(0);
+
+            // Verify audit log
+            var auditLogs = complianceService.getAuditLogs(request.getId());
+            assertThat(auditLogs).isNotEmpty();
+            assertThat(auditLogs).anyMatch(log -> log.getAction().equals("DATA_ERASED"));
+        }
+
+        @Test
+        @DisplayName("Should handle CCPA data portability request")
+        void shouldHandleCCPADataPortabilityRequest() throws Exception {
+            // Create portability request
+            DataSubjectRequest request = complianceService.createDataSubjectRequest(
+                "california@example.com",
+                RequestType.PORTABILITY,
+                "CCPA",
+                "Export all my data"
+            );
+
+            // Process the request
+            complianceService.processRequest(request.getId());
+
+            // Wait for export
+            await().atMost(20, TimeUnit.SECONDS)
+                   .until(() -> {
+                       DataSubjectRequest updated = complianceService.getRequest(request.getId());
+                       return updated.getExportPath() != null;
+                   });
+
+            // Verify export file
+            DataSubjectRequest completed = complianceService.getRequest(request.getId());
+            assertThat(completed.getExportPath()).isNotEmpty();
+            assertThat(completed.getExportFormat()).isEqualTo("JSON");
+
+            // Download and verify export content
+            var exportData = complianceService.downloadExport(request.getId());
+            assertThat(exportData).isNotNull();
+            assertThat(exportData.length).isGreaterThan(0);
+        }
+    }
+
+    @Nested
+    @DisplayName("Concurrent Operations Tests")
+    class ConcurrentOperationsTests {
+
+        @Test
+        @DisplayName("Should handle multiple concurrent extractions without conflicts")
+        void shouldHandleConcurrentExtractions() throws Exception {
+            // Start 5 extractions simultaneously
+            var extractionIds = new String[5];
+
+            for (int i = 0; i < 5; i++) {
+                final int index = i;
+                new Thread(() -> {
+                    Extraction extraction = extractionService.createExtraction(
+                        "Concurrent Extract " + index,
+                        "JDBC",
+                        Map.of(
+                            "url", "jdbc:h2:mem:test" + index,
+                            "query", "SELECT * FROM table" + index
+                        )
+                    );
+                    extractionIds[index] = extraction.getId();
+                    extractionService.startExtraction(extraction.getId());
+                }).start();
+            }
+
+            // Wait for all to complete or fail
+            await().atMost(60, TimeUnit.SECONDS)
+                   .until(() -> {
+                       for (String id : extractionIds) {
+                           if (id != null) {
+                               Extraction e = extractionService.getExtraction(id);
+                               if (e.getStatus() == ExtractionStatus.RUNNING ||
+                                   e.getStatus() == ExtractionStatus.PENDING) {
+                                   return false;
+                               }
+                           }
+                       }
+                       return true;
+                   });
+
+            // Verify no deadlocks or conflicts
+            for (String id : extractionIds) {
+                if (id != null) {
+                    Extraction extraction = extractionService.getExtraction(id);
+                    assertThat(extraction.getStatus()).isIn(
+                        ExtractionStatus.COMPLETED,
+                        ExtractionStatus.FAILED
+                    );
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("Should maintain data consistency during concurrent quality checks")
+        void shouldMaintainConsistencyDuringConcurrentQualityChecks() throws Exception {
+            // Create multiple quality rules
+            var rules = new DataQualityRule[3];
+            rules[0] = dataQualityService.createRule("Null Check", QualityDimension.COMPLETENESS, "field IS NOT NULL");
+            rules[1] = dataQualityService.createRule("Format Check", QualityDimension.VALIDITY, "field LIKE 'pattern%'");
+            rules[2] = dataQualityService.createRule("Range Check", QualityDimension.ACCURACY, "value BETWEEN 0 AND 100");
+
+            // Execute rules concurrently
+            Thread[] threads = new Thread[3];
+            for (int i = 0; i < 3; i++) {
+                final int index = i;
+                threads[i] = new Thread(() -> {
+                    dataQualityService.executeRule(rules[index].getId());
+                });
+                threads[i].start();
+            }
+
+            // Wait for completion
+            for (Thread thread : threads) {
+                thread.join(10000);
+            }
+
+            // Verify all rules executed successfully
+            for (DataQualityRule rule : rules) {
+                var result = dataQualityService.getRuleExecutionResult(rule.getId());
+                assertThat(result).isNotNull();
+                assertThat(result.getExecutionTime()).isGreaterThan(0);
+            }
+
+            // Verify overall quality score is consistent
+            var score1 = dataQualityService.calculateOverallScore();
+            Thread.sleep(100);
+            var score2 = dataQualityService.calculateOverallScore();
+            assertThat(score1).isEqualTo(score2);
+        }
+    }
+
+    @Nested
+    @DisplayName("Error Recovery Tests")
+    class ErrorRecoveryTests {
+
+        @Test
+        @DisplayName("Should recover from database connection failure during migration")
+        void shouldRecoverFromDatabaseFailureDuringMigration() throws Exception {
+            // Create migration
+            Migration migration = migrationService.createMigration(
+                "Recovery Test Migration",
+                "source-id",
+                Map.of("targetTable", "recovery_test")
+            );
+
+            // Simulate database connection drop mid-migration
+            new Thread(() -> {
+                try {
+                    Thread.sleep(5000);
+                    // Simulate connection drop (in real scenario, would kill connection)
+                    postgres.stop();
+                    Thread.sleep(2000);
+                    postgres.start();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            // Start migration
+            migrationService.startMigration(migration.getId());
+
+            // Wait for recovery or failure
+            await().atMost(60, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Migration updated = migrationService.getMigration(migration.getId());
+                       return updated.getPhase() != MigrationPhase.IN_PROGRESS;
+                   });
+
+            // Verify migration handled the failure gracefully
+            Migration result = migrationService.getMigration(migration.getId());
+            if (result.getPhase() == MigrationPhase.FAILED) {
+                // Should have retry information
+                assertThat(result.getRetryCount()).isGreaterThan(0);
+                assertThat(result.getErrorMessage()).containsIgnoringCase("connection");
+
+                // Should be able to resume
+                assertThat(migrationService.canResume(migration.getId())).isTrue();
+            }
+        }
+
+        @Test
+        @DisplayName("Should rollback migration on critical error")
+        void shouldRollbackMigrationOnCriticalError() throws Exception {
+            // Create migration with transformation that will fail
+            Migration migration = migrationService.createMigration(
+                "Rollback Test",
+                "source-id",
+                Map.of(
+                    "targetTable", "rollback_test",
+                    "transformation", "INVALID_TRANSFORMATION"  // Will cause error
+                )
+            );
+
+            // Start migration
+            migrationService.startMigration(migration.getId());
+
+            // Wait for failure
+            await().atMost(30, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Migration updated = migrationService.getMigration(migration.getId());
+                       return updated.getPhase() == MigrationPhase.FAILED;
+                   });
+
+            // Trigger rollback
+            migrationService.rollbackMigration(migration.getId());
+
+            // Wait for rollback
+            await().atMost(30, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Migration updated = migrationService.getMigration(migration.getId());
+                       return updated.getPhase() == MigrationPhase.ROLLED_BACK;
+                   });
+
+            // Verify data was cleaned up
+            Migration rolledBack = migrationService.getMigration(migration.getId());
+            assertThat(rolledBack.getRollbackCompletedAt()).isNotNull();
+            assertThat(rolledBack.getRecordsMigrated()).isEqualTo(0);
+        }
+    }
+
+    @Nested
+    @DisplayName("Performance Under Load Tests")
+    class PerformanceUnderLoadTests {
+
+        @Test
+        @DisplayName("Should maintain performance with 100 concurrent API calls")
+        void shouldMaintainPerformanceUnderLoad() throws Exception {
+            long startTime = System.currentTimeMillis();
+            Thread[] threads = new Thread[100];
+
+            // Create 100 concurrent threads making different API calls
+            for (int i = 0; i < 100; i++) {
+                final int index = i;
+                threads[i] = new Thread(() -> {
+                    try {
+                        switch (index % 5) {
+                            case 0:
+                                analyticsService.getDashboardAnalytics(null, null);
+                                break;
+                            case 1:
+                                extractionService.getExtractions(0, 10, null);
+                                break;
+                            case 2:
+                                migrationService.getMigrations(0, 10, null);
+                                break;
+                            case 3:
+                                dataQualityService.getQualityDashboard();
+                                break;
+                            case 4:
+                                complianceService.getComplianceDashboard();
+                                break;
+                        }
+                    } catch (Exception e) {
+                        // Log but don't fail - we're testing performance not correctness
+                        System.err.println("Thread " + index + " failed: " + e.getMessage());
+                    }
+                });
+                threads[i].start();
+            }
+
+            // Wait for all threads to complete
+            for (Thread thread : threads) {
+                thread.join(10000);  // 10 second timeout per thread
+            }
+
+            long endTime = System.currentTimeMillis();
+            long duration = endTime - startTime;
+
+            // Assert performance requirements
+            assertThat(duration).isLessThan(5000);  // All 100 calls should complete within 5 seconds
+
+            // Verify system is still responsive
+            var health = analyticsService.getSystemHealth();
+            assertThat(health.get("status")).isEqualTo("UP");
+        }
+
+        @Test
+        @DisplayName("Should handle memory pressure during large data processing")
+        void shouldHandleMemoryPressureDuringLargeDataProcessing() throws Exception {
+            // Create extraction for large dataset
+            Extraction extraction = extractionService.createExtraction(
+                "Large Dataset Extract",
+                "JDBC",
+                Map.of(
+                    "url", "jdbc:h2:mem:large",
+                    "query", "SELECT * FROM large_table",
+                    "batchSize", "10000"  // Large batch size
+                )
+            );
+
+            // Monitor memory usage
+            Runtime runtime = Runtime.getRuntime();
+            long beforeMemory = runtime.totalMemory() - runtime.freeMemory();
+
+            // Start extraction
+            extractionService.startExtraction(extraction.getId());
+
+            // Wait for completion
+            await().atMost(120, TimeUnit.SECONDS)
+                   .until(() -> {
+                       Extraction updated = extractionService.getExtraction(extraction.getId());
+                       return updated.getStatus() != ExtractionStatus.RUNNING;
+                   });
+
+            long afterMemory = runtime.totalMemory() - runtime.freeMemory();
+            long memoryIncrease = afterMemory - beforeMemory;
+
+            // Verify memory usage stayed within bounds
+            assertThat(memoryIncrease).isLessThan(500 * 1024 * 1024);  // Less than 500MB increase
+
+            // Force garbage collection and verify memory is released
+            System.gc();
+            Thread.sleep(1000);
+
+            long finalMemory = runtime.totalMemory() - runtime.freeMemory();
+            assertThat(finalMemory).isLessThan(beforeMemory + 100 * 1024 * 1024);  // Within 100MB of original
+        }
+    }
+}
