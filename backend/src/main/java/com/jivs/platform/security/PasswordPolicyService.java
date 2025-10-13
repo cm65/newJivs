@@ -20,7 +20,7 @@ public class PasswordPolicyService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PasswordPolicyService.class);
 
-    @Autowired
+    @Autowired(required = false)
     private RedisTemplate<String, String> redisTemplate;
 
     @Autowired
@@ -123,6 +123,10 @@ public class PasswordPolicyService {
      * Check if password was used recently
      */
     private boolean isPasswordInHistory(String userId, String password) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, skipping password history check");
+            return false;
+        }
         try {
             String key = "password:history:" + userId;
             List<String> passwordHistory = redisTemplate.opsForList().range(key, 0, PASSWORD_HISTORY_SIZE - 1);
@@ -145,6 +149,10 @@ public class PasswordPolicyService {
      * Add password to user's history
      */
     public void addToPasswordHistory(String userId, String passwordHash) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, skipping password history tracking");
+            return;
+        }
         try {
             String key = "password:history:" + userId;
 
@@ -170,6 +178,10 @@ public class PasswordPolicyService {
      * @return Number of failed attempts
      */
     public int recordFailedLogin(String username) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot track failed login attempts");
+            return 0;
+        }
         try {
             String key = "login:failed:" + username;
             Long attempts = redisTemplate.opsForValue().increment(key);
@@ -196,6 +208,10 @@ public class PasswordPolicyService {
      * Reset failed login attempts (called on successful login)
      */
     public void resetFailedLoginAttempts(String username) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot reset failed login attempts");
+            return;
+        }
         try {
             String key = "login:failed:" + username;
             redisTemplate.delete(key);
@@ -209,6 +225,9 @@ public class PasswordPolicyService {
      * Check if account is locked
      */
     public boolean isAccountLocked(String username) {
+        if (redisTemplate == null) {
+            return false; // Fail open - allow login if Redis unavailable
+        }
         try {
             String key = "account:locked:" + username;
             return Boolean.TRUE.equals(redisTemplate.hasKey(key));
@@ -222,6 +241,10 @@ public class PasswordPolicyService {
      * Lock account due to excessive failed attempts
      */
     private void lockAccount(String username) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot lock account for: {}", username);
+            return;
+        }
         try {
             String key = "account:locked:" + username;
             redisTemplate.opsForValue().set(key, String.valueOf(System.currentTimeMillis()));
@@ -237,6 +260,10 @@ public class PasswordPolicyService {
      * Unlock account (admin action)
      */
     public void unlockAccount(String username) {
+        if (redisTemplate == null) {
+            log.warn("Redis not available, cannot unlock account for: {}", username);
+            return;
+        }
         try {
             redisTemplate.delete("account:locked:" + username);
             redisTemplate.delete("login:failed:" + username);
@@ -250,6 +277,9 @@ public class PasswordPolicyService {
      * Get remaining lockout time in seconds
      */
     public long getRemainingLockoutTime(String username) {
+        if (redisTemplate == null) {
+            return 0;
+        }
         try {
             String key = "account:locked:" + username;
             Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
@@ -264,6 +294,9 @@ public class PasswordPolicyService {
      * Get number of failed login attempts
      */
     public int getFailedLoginAttempts(String username) {
+        if (redisTemplate == null) {
+            return 0;
+        }
         try {
             String key = "login:failed:" + username;
             String value = redisTemplate.opsForValue().get(key);
