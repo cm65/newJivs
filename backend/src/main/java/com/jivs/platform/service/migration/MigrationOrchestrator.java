@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -56,6 +57,13 @@ public class MigrationOrchestrator {
         migration.setMigrationType(request.getMigrationType());
         migration.setStatus(MigrationStatus.INITIALIZED);
         migration.setPhase(MigrationPhase.PLANNING);
+
+        // Generate unique project code (required field)
+        migration.setProjectCode(generateProjectCode(request.getName()));
+
+        // Set project type (required field) - use migrationType or default to "DATA_MIGRATION"
+        migration.setProjectType(request.getMigrationType() != null ? request.getMigrationType() : "DATA_MIGRATION");
+
         // Note: createdDate is set automatically by @CreatedDate
         migration.setCreatedBy(request.getUserId() != null ? request.getUserId().toString() : null);
 
@@ -587,5 +595,23 @@ public class MigrationOrchestrator {
         }
 
         return Duration.ZERO;
+    }
+
+    /**
+     * Generate unique project code from migration name
+     * Format: MIG-YYYYMMDD-XXXXX (e.g., MIG-20251013-12345)
+     */
+    private String generateProjectCode(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            name = "MIGRATION";
+        }
+
+        // Create base code from date
+        String dateStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+
+        // Generate random 5-digit number for uniqueness
+        int random = ThreadLocalRandom.current().nextInt(10000, 99999);
+
+        return String.format("MIG-%s-%05d", dateStr, random);
     }
 }
