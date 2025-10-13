@@ -1,0 +1,57 @@
+version: '3.8'
+
+# Test environment configuration for integration tests
+# This provides isolated test databases that don't affect development data
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: jivs-postgres-test
+    environment:
+      POSTGRES_DB: jivs_test
+      POSTGRES_USER: jivs_test
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with dev DB
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jivs_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: jivs-redis-test
+    ports:
+      - "6380:6379"  # Different port to avoid conflict with dev Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch-test:
+    image: elasticsearch:8.11.0
+    container_name: jivs-elasticsearch-test
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9201:9200"  # Different port to avoid conflict
+      - "9301:9300"
+    volumes:
+      - elasticsearch-test-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-test-data:
+    driver: local
+  elasticsearch-test-data:
+    driver: local
