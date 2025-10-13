@@ -17,10 +17,18 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: production
-      - key: SPRING_DATASOURCE_URL
+      - key: DB_HOST
         fromDatabase:
           name: jivs-postgres
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: jivs-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: jivs-postgres
+          property: database
       - key: SPRING_DATASOURCE_USERNAME
         fromDatabase:
           name: jivs-postgres
@@ -29,6 +37,8 @@ services:
         fromDatabase:
           name: jivs-postgres
           property: password
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     healthCheckPath: /actuator/health
 
   # Frontend
