@@ -1,47 +1,57 @@
 package com.jivs.platform.repository;
 
+import com.jivs.platform.domain.quality.DataQualityCheck;
 import com.jivs.platform.domain.quality.DataQualityReport;
-import com.jivs.platform.domain.quality.QualityCheckStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Repository for DataQualityReport entity
+ * Maps to data_quality_results table - stores individual validation results
  */
 @Repository
 public interface DataQualityReportRepository extends JpaRepository<DataQualityReport, Long> {
 
     /**
-     * Find reports by dataset
+     * Find all results for a specific quality check
      */
-    List<DataQualityReport> findByDatasetId(Long datasetId);
+    List<DataQualityReport> findByCheck(DataQualityCheck check);
 
     /**
-     * Find reports by dataset type
+     * Find results by error type
      */
-    List<DataQualityReport> findByDatasetType(String datasetType);
+    List<DataQualityReport> findByErrorType(String errorType);
 
     /**
-     * Find reports by status
+     * Find results by severity
      */
-    List<DataQualityReport> findByStatus(QualityCheckStatus status);
+    List<DataQualityReport> findBySeverity(String severity);
 
     /**
-     * Find latest report for dataset
+     * Find unresolved quality issues
      */
-    Optional<DataQualityReport> findFirstByDatasetIdOrderByCheckDateDesc(Long datasetId);
+    List<DataQualityReport> findByResolved(boolean resolved);
 
     /**
-     * Find reports within date range
+     * Find results by field name
      */
-    List<DataQualityReport> findByCheckDateBetween(LocalDateTime start, LocalDateTime end);
+    List<DataQualityReport> findByFieldName(String fieldName);
 
     /**
-     * Find reports by quality score range
+     * Find results within date range
      */
-    List<DataQualityReport> findByQualityScoreBetween(Double minScore, Double maxScore);
+    List<DataQualityReport> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Find results resolved by specific user
+     */
+    List<DataQualityReport> findByResolvedBy(String resolvedBy);
+
+    /**
+     * Find results by record ID
+     */
+    List<DataQualityReport> findByRecordId(String recordId);
 }

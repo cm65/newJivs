@@ -22,35 +22,70 @@ public class DataQualityCheck {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "check_id", nullable = false, unique = true, length = 100)
+    private String checkId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rule_id", nullable = false)
     private DataQualityRule rule;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "report_id")
-    private DataQualityReport report;
+    @Column(name = "target_table", length = 100)
+    private String targetTable;
+
+    @Column(name = "target_schema", length = 100)
+    private String targetSchema;
+
+    @Column(name = "check_status", nullable = false, length = 50)
+    private String checkStatus;
+
+    @Column(name = "start_time")
+    private LocalDateTime startTime;
+
+    @Column(name = "end_time")
+    private LocalDateTime endTime;
+
+    @Column(name = "records_checked")
+    private Long recordsChecked = 0L;
+
+    @Column(name = "records_passed")
+    private Long recordsPassed = 0L;
+
+    @Column(name = "records_failed")
+    private Long recordsFailed = 0L;
+
+    @Column(name = "quality_score")
+    private Double qualityScore;
+
+    @Column(name = "check_params", columnDefinition = "jsonb")
+    private String checkParams;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "triggered_by", length = 50)
+    private String triggeredBy;
+
+    // Fields below are NOT in database - marked as @Transient
+    @Transient
+    private DataQualityReport report;
+
+    @Transient
     private LocalDateTime executionTime;
 
-    @Column(nullable = false)
+    @Transient
     private boolean passed;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Transient
     private Severity severity;
 
-    @Column(columnDefinition = "TEXT")
+    @Transient
     private String failureDetails;
 
-    @Column(columnDefinition = "TEXT")
+    @Transient
     private String errorMessage;
 
-    private Long recordsChecked;
-
-    private Long recordsFailed;
-
+    @Transient
     private Double passPercentage;
 
     // Getters and Setters
@@ -140,5 +175,93 @@ public class DataQualityCheck {
 
     public void setPassPercentage(Double passPercentage) {
         this.passPercentage = passPercentage;
+    }
+
+    public String getCheckId() {
+        return checkId;
+    }
+
+    public void setCheckId(String checkId) {
+        this.checkId = checkId;
+    }
+
+    public String getTargetTable() {
+        return targetTable;
+    }
+
+    public void setTargetTable(String targetTable) {
+        this.targetTable = targetTable;
+    }
+
+    public String getTargetSchema() {
+        return targetSchema;
+    }
+
+    public void setTargetSchema(String targetSchema) {
+        this.targetSchema = targetSchema;
+    }
+
+    public String getCheckStatus() {
+        return checkStatus;
+    }
+
+    public void setCheckStatus(String checkStatus) {
+        this.checkStatus = checkStatus;
+    }
+
+    public LocalDateTime getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(LocalDateTime startTime) {
+        this.startTime = startTime;
+    }
+
+    public LocalDateTime getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(LocalDateTime endTime) {
+        this.endTime = endTime;
+    }
+
+    public Long getRecordsPassed() {
+        return recordsPassed;
+    }
+
+    public void setRecordsPassed(Long recordsPassed) {
+        this.recordsPassed = recordsPassed;
+    }
+
+    public Double getQualityScore() {
+        return qualityScore;
+    }
+
+    public void setQualityScore(Double qualityScore) {
+        this.qualityScore = qualityScore;
+    }
+
+    public String getCheckParams() {
+        return checkParams;
+    }
+
+    public void setCheckParams(String checkParams) {
+        this.checkParams = checkParams;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getTriggeredBy() {
+        return triggeredBy;
+    }
+
+    public void setTriggeredBy(String triggeredBy) {
+        this.triggeredBy = triggeredBy;
     }
 }

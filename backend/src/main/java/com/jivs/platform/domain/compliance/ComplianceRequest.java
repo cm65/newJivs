@@ -13,13 +13,13 @@ import java.util.Map;
 
 /**
  * Entity representing a compliance request (GDPR, CCPA, etc.)
+ * Maps to data_subject_requests table
  */
 @Entity
-@Table(name = "compliance_requests", indexes = {
-    @Index(name = "idx_compliance_request_user", columnList = "user_id"),
-    @Index(name = "idx_compliance_request_status", columnList = "status"),
-    @Index(name = "idx_compliance_request_type", columnList = "request_type"),
-    @Index(name = "idx_compliance_request_date", columnList = "created_date")
+@Table(name = "data_subject_requests", indexes = {
+    @Index(name = "idx_data_subject_requests_status", columnList = "status"),
+    @Index(name = "idx_data_subject_requests_request_id", columnList = "request_id"),
+    @Index(name = "idx_data_subject_requests_due_date", columnList = "due_date")
 })
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,97 +30,124 @@ public class ComplianceRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long userId;
+    @Column(name = "request_id", nullable = false, unique = true, length = 100)
+    private String requestId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, name = "request_type")
+    @Column(nullable = false, name = "request_type", length = 50)
     private ComplianceRequestType requestType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Regulation regulation;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ComplianceStatus status = ComplianceStatus.SUBMITTED;
-
-    @Column(nullable = false)
+    @Column(nullable = false, name = "subject_email", length = 255)
     private String subjectEmail;
 
-    @Column
+    @Column(name = "subject_name", length = 200)
+    private String subjectName;
+
+    @Column(name = "subject_identifier", length = 255)
     private String subjectIdentifier;
 
-    @Column
-    private String requesterEmail;
+    @Column(name = "request_details", columnDefinition = "TEXT")
+    private String requestDetails;
 
-    @Column
-    private String requesterName;
+    @Column(name = "request_source", length = 50)
+    private String requestSource;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private ComplianceStatus status = ComplianceStatus.SUBMITTED;
 
-    @Column(columnDefinition = "TEXT")
-    private String reason;
+    @Column(length = 20)
+    private String priority = "MEDIUM";
 
-    @Column(columnDefinition = "TEXT")
-    private String verificationToken;
+    @Column(name = "due_date", nullable = false)
+    private java.time.LocalDate dueDate;
 
-    @Column
+    @Column(name = "completed_date")
+    private java.time.LocalDate completedDate;
+
+    @Column(name = "verification_status", length = 50)
+    private String verificationStatus;
+
+    @Column(name = "verification_method", length = 50)
+    private String verificationMethod;
+
+    @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
-    @Column
-    private LocalDateTime submittedDate;
+    @Column(name = "verified_by", length = 50)
+    private String verifiedBy;
 
-    @Column
-    private LocalDateTime dueDate;
+    @Column(name = "assigned_to", length = 50)
+    private String assignedTo;
 
-    @Column
-    private LocalDateTime processingStarted;
+    @Column(name = "response_message", columnDefinition = "TEXT")
+    private String responseMessage;
 
-    @Column
-    private LocalDateTime completedDate;
-
-    @Column(columnDefinition = "TEXT")
-    private String processingNotes;
-
-    @Column(columnDefinition = "TEXT")
-    private String resultSummary;
-
-    @Column
-    private String resultPath;
-
-    @Column
-    private String exportFormat;
-
-    @Column(columnDefinition = "TEXT")
-    private String errorMessage;
-
-    @Column
-    private String processedBy;
-
-    @ElementCollection
-    @CollectionTable(name = "compliance_request_corrections", joinColumns = @JoinColumn(name = "request_id"))
-    @MapKeyColumn(name = "field_name")
-    @Column(name = "field_value", columnDefinition = "TEXT")
-    private Map<String, Object> corrections = new HashMap<>();
-
-    @ElementCollection
-    @CollectionTable(name = "compliance_request_metadata", joinColumns = @JoinColumn(name = "request_id"))
-    @MapKeyColumn(name = "metadata_key")
-    @Column(name = "metadata_value", columnDefinition = "TEXT")
-    private Map<String, String> metadata = new HashMap<>();
-
-    @Column(nullable = false)
-    private Integer retentionDays = 90;  // How long to keep the request record
+    @Column(name = "internal_notes", columnDefinition = "TEXT")
+    private String internalNotes;
 
     @CreatedDate
-    @Column(nullable = false, updatable = false, name = "created_date")
-    private LocalDateTime createdDate;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(nullable = false)
-    private LocalDateTime lastModifiedDate;
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    // Fields below are NOT in database - marked as @Transient
+    @Transient
+    private Long userId;
+
+    @Transient
+    private Regulation regulation;
+
+    @Transient
+    private String requesterEmail;
+
+    @Transient
+    private String requesterName;
+
+    @Transient
+    private String description;
+
+    @Transient
+    private String reason;
+
+    @Transient
+    private String verificationToken;
+
+    @Transient
+    private LocalDateTime submittedDate;
+
+    @Transient
+    private LocalDateTime processingStarted;
+
+    @Transient
+    private String processingNotes;
+
+    @Transient
+    private String resultSummary;
+
+    @Transient
+    private String resultPath;
+
+    @Transient
+    private String exportFormat;
+
+    @Transient
+    private String errorMessage;
+
+    @Transient
+    private String processedBy;
+
+    @Transient
+    private Map<String, Object> corrections = new HashMap<>();
+
+    @Transient
+    private Map<String, String> metadata = new HashMap<>();
+
+    @Transient
+    private Integer retentionDays = 90;
 
     // Getters and Setters
     public Long getId() { return id; }
@@ -165,14 +192,14 @@ public class ComplianceRequest {
     public LocalDateTime getSubmittedDate() { return submittedDate; }
     public void setSubmittedDate(LocalDateTime submittedDate) { this.submittedDate = submittedDate; }
 
-    public LocalDateTime getDueDate() { return dueDate; }
-    public void setDueDate(LocalDateTime dueDate) { this.dueDate = dueDate; }
+    public java.time.LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(java.time.LocalDate dueDate) { this.dueDate = dueDate; }
 
     public LocalDateTime getProcessingStarted() { return processingStarted; }
     public void setProcessingStarted(LocalDateTime processingStarted) { this.processingStarted = processingStarted; }
 
-    public LocalDateTime getCompletedDate() { return completedDate; }
-    public void setCompletedDate(LocalDateTime completedDate) { this.completedDate = completedDate; }
+    public java.time.LocalDate getCompletedDate() { return completedDate; }
+    public void setCompletedDate(java.time.LocalDate completedDate) { this.completedDate = completedDate; }
 
     public String getProcessingNotes() { return processingNotes; }
     public void setProcessingNotes(String processingNotes) { this.processingNotes = processingNotes; }
@@ -201,18 +228,59 @@ public class ComplianceRequest {
     public Integer getRetentionDays() { return retentionDays; }
     public void setRetentionDays(Integer retentionDays) { this.retentionDays = retentionDays; }
 
-    public LocalDateTime getCreatedDate() { return createdDate; }
-    public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
+    // New DB field getters/setters
+    public String getRequestId() { return requestId; }
+    public void setRequestId(String requestId) { this.requestId = requestId; }
 
-    public LocalDateTime getLastModifiedDate() { return lastModifiedDate; }
-    public void setLastModifiedDate(LocalDateTime lastModifiedDate) { this.lastModifiedDate = lastModifiedDate; }
+    public String getSubjectName() { return subjectName; }
+    public void setSubjectName(String subjectName) { this.subjectName = subjectName; }
+
+    public String getRequestDetails() { return requestDetails; }
+    public void setRequestDetails(String requestDetails) { this.requestDetails = requestDetails; }
+
+    public String getRequestSource() { return requestSource; }
+    public void setRequestSource(String requestSource) { this.requestSource = requestSource; }
+
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+
+    public String getVerificationStatus() { return verificationStatus; }
+    public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+
+    public String getVerificationMethod() { return verificationMethod; }
+    public void setVerificationMethod(String verificationMethod) { this.verificationMethod = verificationMethod; }
+
+    public String getVerifiedBy() { return verifiedBy; }
+    public void setVerifiedBy(String verifiedBy) { this.verifiedBy = verifiedBy; }
+
+    public String getAssignedTo() { return assignedTo; }
+    public void setAssignedTo(String assignedTo) { this.assignedTo = assignedTo; }
+
+    public String getResponseMessage() { return responseMessage; }
+    public void setResponseMessage(String responseMessage) { this.responseMessage = responseMessage; }
+
+    public String getInternalNotes() { return internalNotes; }
+    public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    // Backward compatibility for old field names
+    public LocalDateTime getCreatedDate() { return createdAt; }
+    public void setCreatedDate(LocalDateTime createdDate) { this.createdAt = createdDate; }
+
+    public LocalDateTime getLastModifiedDate() { return updatedAt; }
+    public void setLastModifiedDate(LocalDateTime lastModifiedDate) { this.updatedAt = lastModifiedDate; }
 
     /**
      * Helper method to check if request is overdue
      */
     @Transient
     public boolean isOverdue() {
-        return dueDate != null && LocalDateTime.now().isAfter(dueDate)
+        return dueDate != null && java.time.LocalDate.now().isAfter(dueDate)
                && status != ComplianceStatus.COMPLETED && status != ComplianceStatus.CANCELLED;
     }
 

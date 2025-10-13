@@ -4,7 +4,7 @@
 
 export interface ExtractionConfig {
   name: string;
-  sourceType: 'JDBC' | 'SAP' | 'FILE' | 'API';
+  sourceType: 'POSTGRESQL' | 'MYSQL' | 'SQL_SERVER' | 'ORACLE' | 'SAP' | 'FILE' | 'API';
   extractionQuery?: string;
   connectionConfig?: Record<string, any>;
   schedule?: string;
@@ -17,7 +17,7 @@ export function createTestExtraction(overrides: Partial<ExtractionConfig> = {}):
   const timestamp = Date.now();
   return {
     name: `E2E Test Extraction ${timestamp}`,
-    sourceType: 'JDBC',
+    sourceType: 'POSTGRESQL',
     extractionQuery: 'SELECT * FROM test_table LIMIT 100',
     connectionConfig: {
       host: 'localhost',
@@ -46,9 +46,9 @@ export function createTestExtractions(count: number, overrides: Partial<Extracti
  * Predefined test extraction configurations
  */
 export const testExtractionConfigs = {
-  jdbc: {
-    name: 'JDBC Test Extraction',
-    sourceType: 'JDBC' as const,
+  postgresql: {
+    name: 'PostgreSQL Test Extraction',
+    sourceType: 'POSTGRESQL' as const,
     extractionQuery: 'SELECT * FROM customers WHERE active = true',
     connectionConfig: {
       host: 'localhost',

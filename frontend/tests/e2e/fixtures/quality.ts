@@ -44,7 +44,7 @@ export function createTestProfileRequest(overrides: Partial<ProfileRequest> = {}
   const timestamp = Date.now();
   return {
     datasetName: `E2E_TEST_DATASET_${timestamp}`,
-    dataSource: 'JDBC',
+    dataSource: 'POSTGRESQL',
     tableName: 'test_table',
     query: 'SELECT * FROM test_table LIMIT 1000',
     ...overrides,

@@ -18,15 +18,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Migration entity representing a data migration job
+ * Migration entity representing a data migration project
+ * Maps to migration_projects table
+ * Note: This entity will need refactoring - should be split into MigrationProject and MigrationJob entities
  */
 @Entity
-@Table(name = "migrations", indexes = {
-        @Index(name = "idx_migrations_status", columnList = "status"),
-        @Index(name = "idx_migrations_phase", columnList = "phase"),
-        @Index(name = "idx_migrations_source_system", columnList = "source_system"),
-        @Index(name = "idx_migrations_target_system", columnList = "target_system"),
-        @Index(name = "idx_migrations_created_date", columnList = "created_date")
+@Table(name = "migration_projects", indexes = {
+        @Index(name = "idx_migration_projects_status", columnList = "status"),
+        @Index(name = "idx_migration_projects_code", columnList = "project_code")
 })
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor
@@ -36,6 +35,9 @@ public class Migration {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "project_code", nullable = false, unique = true, length = 50)
+    private String projectCode;
 
     @Column(nullable = false, length = 200)
     private String name;
@@ -49,107 +51,44 @@ public class Migration {
     @Column(name = "target_system", nullable = false, length = 100)
     private String targetSystem;
 
-    @Column(name = "migration_type", length = 50)
-    private String migrationType;
+    @Column(name = "project_type", nullable = false, length = 50)
+    private String projectType;
 
     @Column(nullable = false, length = 50)
     @Enumerated(EnumType.STRING)
     private MigrationStatus status = MigrationStatus.INITIALIZED;
 
-    @Column(nullable = false, length = 50)
-    @Enumerated(EnumType.STRING)
-    private MigrationPhase phase = MigrationPhase.PLANNING;
+    @Column(length = 20)
+    private String priority = "MEDIUM";
 
-    @Embedded
-    private MigrationMetrics metrics = new MigrationMetrics();
+    @Column(name = "start_date")
+    private java.time.LocalDate startDate;
 
-    @ElementCollection
-    @CollectionTable(name = "migration_parameters",
-                     joinColumns = @JoinColumn(name = "migration_id"))
-    @MapKeyColumn(name = "param_key")
-    @Column(name = "param_value", columnDefinition = "TEXT")
-    private Map<String, String> parameters = new HashMap<>();
+    @Column(name = "end_date")
+    private java.time.LocalDate endDate;
 
-    @Column(name = "batch_size")
-    private Integer batchSize = 1000;
+    @Column(name = "planned_cutover_date")
+    private java.time.LocalDate plannedCutoverDate;
 
-    @Column(name = "parallelism")
-    private Integer parallelism = 4;
+    @Column(name = "actual_cutover_date")
+    private java.time.LocalDate actualCutoverDate;
 
-    @Column(name = "retry_attempts")
-    private Integer retryAttempts = 3;
+    @Column(name = "estimated_records")
+    private Long estimatedRecords;
 
-    @Column(name = "strict_validation")
-    private boolean strictValidation = false;
+    @Column(name = "estimated_size_gb")
+    private java.math.BigDecimal estimatedSizeGb;
 
-    @Column(name = "rollback_enabled")
-    private boolean rollbackEnabled = true;
-
-    @Column(name = "rollback_on_cancel")
-    private boolean rollbackOnCancel = false;
-
-    @Column(name = "archive_enabled")
-    private boolean archiveEnabled = false;
-
-    @Column(name = "start_time")
-    private LocalDateTime startTime;
-
-    @Column(name = "completion_time")
-    private LocalDateTime completionTime;
-
-    @Column(name = "paused_time")
-    private LocalDateTime pausedTime;
-
-    @Column(name = "resumed_time")
-    private LocalDateTime resumedTime;
-
-    @Column(name = "cancelled_time")
-    private LocalDateTime cancelledTime;
-
-    @Column(name = "rollback_time")
-    private LocalDateTime rollbackTime;
-
-    @Column(name = "rollback_executed")
-    private boolean rollbackExecuted = false;
-
-    @Column(name = "rollback_failed")
-    private boolean rollbackFailed = false;
-
-    @Column(name = "rollback_error", columnDefinition = "TEXT")
-    private String rollbackError;
-
-    @Column(name = "error_message", columnDefinition = "TEXT")
-    private String errorMessage;
-
-    @Column(name = "error_stack_trace", columnDefinition = "TEXT")
-    private String errorStackTrace;
-
-    // Stored as JSON
-    @Column(name = "source_analysis", columnDefinition = "TEXT")
-    private String sourceAnalysisJson;
-
-    @Column(name = "target_analysis", columnDefinition = "TEXT")
-    private String targetAnalysisJson;
-
-    @Column(name = "migration_plan", columnDefinition = "TEXT")
-    private String migrationPlanJson;
-
-    @Column(name = "resource_estimation", columnDefinition = "TEXT")
-    private String resourceEstimationJson;
-
-    @Column(name = "validation_result", columnDefinition = "TEXT")
-    private String validationResultJson;
-
-    @Column(name = "verification_result", columnDefinition = "TEXT")
-    private String verificationResultJson;
+    @Column(name = "project_metadata", columnDefinition = "jsonb")
+    private String projectMetadata;
 
     @CreatedDate
-    @Column(name = "created_date", nullable = false, updatable = false)
-    private LocalDateTime createdDate;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(name = "updated_date", nullable = false)
-    private LocalDateTime updatedDate;
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
     @Column(name = "created_by", length = 50)
     private String createdBy;
@@ -157,13 +96,101 @@ public class Migration {
     @Column(name = "updated_by", length = 50)
     private String updatedBy;
 
+    // Fields below are NOT in database - marked as @Transient
+    @Transient
+    private String migrationType;
+
+    @Transient
+    private MigrationPhase phase = MigrationPhase.PLANNING;
+
+    @Transient
+    private MigrationMetrics metrics = new MigrationMetrics();
+
+    @Transient
+    private Map<String, String> parameters = new HashMap<>();
+
+    @Transient
+    private Integer batchSize = 1000;
+
+    @Transient
+    private Integer parallelism = 4;
+
+    @Transient
+    private Integer retryAttempts = 3;
+
+    @Transient
+    private boolean strictValidation = false;
+
+    @Transient
+    private boolean rollbackEnabled = true;
+
+    @Transient
+    private boolean rollbackOnCancel = false;
+
+    @Transient
+    private boolean archiveEnabled = false;
+
+    @Transient
+    private LocalDateTime startTime;
+
+    @Transient
+    private LocalDateTime completionTime;
+
+    @Transient
+    private LocalDateTime pausedTime;
+
+    @Transient
+    private LocalDateTime resumedTime;
+
+    @Transient
+    private LocalDateTime cancelledTime;
+
+    @Transient
+    private LocalDateTime rollbackTime;
+
+    @Transient
+    private boolean rollbackExecuted = false;
+
+    @Transient
+    private boolean rollbackFailed = false;
+
+    @Transient
+    private String rollbackError;
+
+    @Transient
+    private String errorMessage;
+
+    @Transient
+    private String errorStackTrace;
+
+    @Transient
+    private String sourceAnalysisJson;
+
+    @Transient
+    private String targetAnalysisJson;
+
+    @Transient
+    private String migrationPlanJson;
+
+    @Transient
+    private String resourceEstimationJson;
+
+    @Transient
+    private String validationResultJson;
+
+    @Transient
+    private String verificationResultJson;
+
     // Static ObjectMapper for JSON serialization/deserialization
     @Transient
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Getters and Setters
+    // Getters and Setters for DB fields
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getProjectCode() { return projectCode; }
+    public void setProjectCode(String projectCode) { this.projectCode = projectCode; }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -177,11 +204,51 @@ public class Migration {
     public String getTargetSystem() { return targetSystem; }
     public void setTargetSystem(String targetSystem) { this.targetSystem = targetSystem; }
 
-    public String getMigrationType() { return migrationType; }
-    public void setMigrationType(String migrationType) { this.migrationType = migrationType; }
+    public String getProjectType() { return projectType; }
+    public void setProjectType(String projectType) { this.projectType = projectType; }
 
     public MigrationStatus getStatus() { return status; }
     public void setStatus(MigrationStatus status) { this.status = status; }
+
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+
+    public java.time.LocalDate getStartDate() { return startDate; }
+    public void setStartDate(java.time.LocalDate startDate) { this.startDate = startDate; }
+
+    public java.time.LocalDate getEndDate() { return endDate; }
+    public void setEndDate(java.time.LocalDate endDate) { this.endDate = endDate; }
+
+    public java.time.LocalDate getPlannedCutoverDate() { return plannedCutoverDate; }
+    public void setPlannedCutoverDate(java.time.LocalDate plannedCutoverDate) { this.plannedCutoverDate = plannedCutoverDate; }
+
+    public java.time.LocalDate getActualCutoverDate() { return actualCutoverDate; }
+    public void setActualCutoverDate(java.time.LocalDate actualCutoverDate) { this.actualCutoverDate = actualCutoverDate; }
+
+    public Long getEstimatedRecords() { return estimatedRecords; }
+    public void setEstimatedRecords(Long estimatedRecords) { this.estimatedRecords = estimatedRecords; }
+
+    public java.math.BigDecimal getEstimatedSizeGb() { return estimatedSizeGb; }
+    public void setEstimatedSizeGb(java.math.BigDecimal estimatedSizeGb) { this.estimatedSizeGb = estimatedSizeGb; }
+
+    public String getProjectMetadata() { return projectMetadata; }
+    public void setProjectMetadata(String projectMetadata) { this.projectMetadata = projectMetadata; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+
+    public String getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
+
+    // Getters and Setters for @Transient fields (for backward compatibility)
+    public String getMigrationType() { return migrationType; }
+    public void setMigrationType(String migrationType) { this.migrationType = migrationType; }
 
     public MigrationPhase getPhase() { return phase; }
     public void setPhase(MigrationPhase phase) { this.phase = phase; }
@@ -246,17 +313,12 @@ public class Migration {
     public String getErrorStackTrace() { return errorStackTrace; }
     public void setErrorStackTrace(String errorStackTrace) { this.errorStackTrace = errorStackTrace; }
 
-    public LocalDateTime getCreatedDate() { return createdDate; }
-    public void setCreatedDate(LocalDateTime createdDate) { this.createdDate = createdDate; }
+    // Backward compatibility for old field names
+    public LocalDateTime getCreatedDate() { return createdAt; }
+    public void setCreatedDate(LocalDateTime createdDate) { this.createdAt = createdDate; }
 
-    public LocalDateTime getUpdatedDate() { return updatedDate; }
-    public void setUpdatedDate(LocalDateTime updatedDate) { this.updatedDate = updatedDate; }
-
-    public String getCreatedBy() { return createdBy; }
-    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
-
-    public String getUpdatedBy() { return updatedBy; }
-    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
+    public LocalDateTime getUpdatedDate() { return updatedAt; }
+    public void setUpdatedDate(LocalDateTime updatedDate) { this.updatedAt = updatedDate; }
 
     // Helper methods to work with JSON fields
     @Transient

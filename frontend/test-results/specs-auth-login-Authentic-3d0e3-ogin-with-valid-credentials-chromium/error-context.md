@@ -1,0 +1,186 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - button "Skip to main content" [ref=e4] [cursor=pointer]
+    - banner [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: Dashboard
+        - generic [ref=e8]:
+          - button "Switch to dark mode" [ref=e9] [cursor=pointer]:
+            - img [ref=e10]
+          - button "Notifications" [ref=e12] [cursor=pointer]:
+            - generic [ref=e13]:
+              - img [ref=e14]
+              - generic [ref=e16]: "3"
+          - button "A admin" [ref=e17] [cursor=pointer]:
+            - generic [ref=e18]: A
+            - generic [ref=e19]: admin
+    - navigation "main navigation" [ref=e20]:
+      - generic [ref=e22]:
+        - generic [ref=e24]: JiVS Platform
+        - separator [ref=e25]
+        - list [ref=e26]:
+          - listitem [ref=e27]:
+            - button "Dashboard" [ref=e28] [cursor=pointer]:
+              - img [ref=e30]
+              - generic [ref=e33]: Dashboard
+          - listitem [ref=e34]:
+            - button "Extractions" [ref=e35] [cursor=pointer]:
+              - img [ref=e37]
+              - generic [ref=e40]: Extractions
+          - listitem [ref=e41]:
+            - button "Migrations" [ref=e42] [cursor=pointer]:
+              - img [ref=e44]
+              - generic [ref=e47]: Migrations
+          - listitem [ref=e48]:
+            - button "Business Objects" [ref=e49] [cursor=pointer]:
+              - img [ref=e51]
+              - generic [ref=e54]: Business Objects
+          - listitem [ref=e55]:
+            - button "Data Quality" [ref=e56] [cursor=pointer]:
+              - img [ref=e58]
+              - generic [ref=e61]: Data Quality
+          - listitem [ref=e62]:
+            - button "Documents" [ref=e63] [cursor=pointer]:
+              - img [ref=e65]
+              - generic [ref=e68]: Documents
+          - listitem [ref=e69]:
+            - button "Settings" [ref=e70] [cursor=pointer]:
+              - img [ref=e72]
+              - generic [ref=e75]: Settings
+        - separator [ref=e76]
+        - generic [ref=e77]:
+          - generic [ref=e78]: Version 1.0.0
+          - generic [ref=e79]: © 2025 JiVS Platform
+    - main [ref=e80]:
+      - navigation "breadcrumb" [ref=e82]:
+        - list [ref=e83]:
+          - listitem [ref=e84]:
+            - link "Home" [ref=e85] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e86]
+              - text: Home
+          - listitem [ref=e88]:
+            - img [ref=e89]
+          - listitem [ref=e91]:
+            - paragraph [ref=e92]: Dashboard
+      - main "Dashboard" [ref=e94]:
+        - generic [ref=e95]:
+          - heading "Dashboard" [level=1] [ref=e96]
+          - paragraph [ref=e97]: Real-time overview of your data integration, migration, and governance operations
+        - region "Key Statistics" [ref=e98]:
+          - heading "Key Statistics" [level=5] [ref=e99]
+          - generic [ref=e100]:
+            - 'button "Total Extractions: 150. Click to view details" [ref=e102] [cursor=pointer]':
+              - button "Total ExtractionsAll time 150 +2.3% 94.7% success rate View" [ref=e103]:
+                - generic [ref=e105]:
+                  - generic [ref=e106]:
+                    - generic [ref=e107]:
+                      - img [ref=e109]
+                      - generic [ref=e111]: Total ExtractionsAll time
+                    - generic [ref=e112]: "150"
+                    - generic [ref=e113]:
+                      - img [ref=e115]
+                      - paragraph [ref=e117]: +2.3%
+                      - generic [ref=e118]: 94.7% success rate
+                  - generic [ref=e120]: View
+            - 'button "Active Migrations: 75. Click to view details" [ref=e122] [cursor=pointer]':
+              - button "Active MigrationsCurrently running 75 +1.8% 93.3% success rate View" [ref=e123]:
+                - generic [ref=e125]:
+                  - generic [ref=e126]:
+                    - generic [ref=e127]:
+                      - img [ref=e129]
+                      - generic [ref=e131]: Active MigrationsCurrently running
+                    - generic [ref=e132]: "75"
+                    - generic [ref=e133]:
+                      - img [ref=e135]
+                      - paragraph [ref=e137]: +1.8%
+                      - generic [ref=e138]: 93.3% success rate
+                  - generic [ref=e140]: View
+            - 'button "Data Quality Score: 87.5. Click to view details" [ref=e142] [cursor=pointer]':
+              - button "Data Quality ScoreLast 30 days 87.5 +2.3% View" [ref=e143]:
+                - generic [ref=e145]:
+                  - generic [ref=e146]:
+                    - generic [ref=e147]:
+                      - img [ref=e149]
+                      - generic [ref=e151]: Data Quality ScoreLast 30 days
+                    - generic [ref=e152]: "87.5"
+                    - generic [ref=e153]:
+                      - img [ref=e155]
+                      - paragraph [ref=e157]: +2.3%
+                  - generic [ref=e159]: View
+            - 'button "Compliance Rate: 92.0. Click to view details" [ref=e161] [cursor=pointer]':
+              - button "Compliance RateGDPR & CCPA 92.0 +1.1% View" [ref=e162]:
+                - generic [ref=e164]:
+                  - generic [ref=e165]:
+                    - generic [ref=e166]:
+                      - img [ref=e168]
+                      - generic [ref=e170]: Compliance RateGDPR & CCPA
+                    - generic [ref=e171]: "92.0"
+                    - generic [ref=e172]:
+                      - img [ref=e174]
+                      - paragraph [ref=e176]: +1.1%
+                  - generic [ref=e178]: View
+        - region "Analytics & Insights" [ref=e179]:
+          - heading "Analytics & Insights" [level=5] [ref=e180]
+          - generic [ref=e181]:
+            - generic [ref=e183]:
+              - heading "Extraction Jobs Overview" [level=6] [ref=e184]
+              - generic [ref=e186]:
+                - img [ref=e187]:
+                  - generic [ref=e191]:
+                    - generic [ref=e193]: Jan
+                    - generic [ref=e195]: Feb
+                    - generic [ref=e197]: Mar
+                    - generic [ref=e199]: Apr
+                    - generic [ref=e201]: May
+                    - generic [ref=e203]: Jun
+                  - generic [ref=e205]:
+                    - generic [ref=e207]: "0"
+                    - generic [ref=e209]: "55"
+                    - generic [ref=e211]: "110"
+                    - generic [ref=e213]: "165"
+                    - generic [ref=e215]: "220"
+                - list [ref=e235]:
+                  - listitem [ref=e236]:
+                    - img [ref=e237]
+                    - text: Total Jobs
+                  - listitem [ref=e239]:
+                    - img [ref=e240]
+                    - text: Successful
+            - generic [ref=e243]:
+              - heading "Migration Status" [level=6] [ref=e244]
+              - img [ref=e247]:
+                - generic [ref=e248]:
+                  - img [ref=e250]
+                  - img [ref=e252]
+                  - img [ref=e254]
+                  - img [ref=e256]
+                  - generic [ref=e257]:
+                    - generic [ref=e259]: "Completed: 45"
+                    - generic [ref=e261]: "In Progress: 30"
+                    - generic [ref=e263]: "Pending: 15"
+                    - generic [ref=e265]: "Failed: 10"
+            - heading "System Performance" [level=6] [ref=e268]
+            - heading "Recent Activities" [level=6] [ref=e292]
+      - button "Quick actions" [ref=e319] [cursor=pointer]:
+        - generic [ref=e320]:
+          - img [ref=e321]
+          - img [ref=e323]
+      - menu:
+        - generic:
+          - generic: New Extraction
+          - menuitem "New Extraction"
+        - generic:
+          - generic: New Migration
+          - menuitem "New Migration"
+        - generic:
+          - generic: Quality Check
+          - menuitem "Quality Check"
+        - generic:
+          - generic: Compliance Report
+          - menuitem "Compliance Report"
+  - generic [ref=e325]: "0"
+```

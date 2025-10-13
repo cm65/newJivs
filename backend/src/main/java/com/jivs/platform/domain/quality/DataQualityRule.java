@@ -26,67 +26,91 @@ public class DataQualityRule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "rule_name", nullable = false)
     private String name;
+
+    @Column(name = "rule_code", nullable = false, unique = true, length = 50)
+    private String ruleCode;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "rule_type", nullable = false)
     private RuleType ruleType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Severity severity;
 
-    @Column(nullable = false)
+    @Column(name = "field_name")
     private String fieldPath;
 
-    @Column(nullable = false)
+    @Column(name = "business_object_id")
+    private Long businessObjectId;
+
+    @Column(name = "rule_expression", nullable = false, columnDefinition = "TEXT")
+    private String ruleExpression;
+
+    @Column(name = "threshold_value")
+    private Double thresholdValue;
+
+    @Column(name = "validation_query", columnDefinition = "TEXT")
+    private String validationQuery;
+
+    @Column(name = "error_message_template", length = 500)
+    private String errorMessageTemplate;
+
+    @Column(name = "remediation_guidance", columnDefinition = "TEXT")
+    private String remediationGuidance;
+
+    // Fields below are NOT in database - marked as @Transient
+    @Transient
     private boolean required = false;
 
+    @Transient
     private String formatPattern;
 
-    @ElementCollection
-    @CollectionTable(name = "rule_reference_data", joinColumns = @JoinColumn(name = "rule_id"))
-    @Column(name = "reference_value")
+    @Transient
     private Set<String> referenceData;
 
-    @Column(columnDefinition = "TEXT")
+    @Transient
     private String consistencyExpression;
 
-    @ElementCollection
-    @CollectionTable(name = "rule_related_fields", joinColumns = @JoinColumn(name = "rule_id"))
-    @Column(name = "field_name")
+    @Transient
     private List<String> relatedFields;
 
+    @Transient
     private String expectedDataType;
 
+    @Transient
     private String minValue;
 
+    @Transient
     private String maxValue;
 
-    @ElementCollection
-    @CollectionTable(name = "rule_allowed_values", joinColumns = @JoinColumn(name = "rule_id"))
-    @Column(name = "allowed_value")
+    @Transient
     private Set<String> allowedValues;
 
+    @Transient
     private Duration timelinessThreshold;
 
+    @Transient
     private String referenceTable;
 
+    @Transient
     private String referenceColumn;
 
-    @Column(columnDefinition = "TEXT")
+    @Transient
     private String businessRuleExpression;
 
+    @Transient
     private String scope;
 
-    @Column(nullable = false)
+    @Transient
     private String datasetType;
 
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
     @CreatedDate
@@ -308,5 +332,61 @@ public class DataQualityRule {
 
     public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
+    }
+
+    public String getRuleCode() {
+        return ruleCode;
+    }
+
+    public void setRuleCode(String ruleCode) {
+        this.ruleCode = ruleCode;
+    }
+
+    public Long getBusinessObjectId() {
+        return businessObjectId;
+    }
+
+    public void setBusinessObjectId(Long businessObjectId) {
+        this.businessObjectId = businessObjectId;
+    }
+
+    public String getRuleExpression() {
+        return ruleExpression;
+    }
+
+    public void setRuleExpression(String ruleExpression) {
+        this.ruleExpression = ruleExpression;
+    }
+
+    public Double getThresholdValue() {
+        return thresholdValue;
+    }
+
+    public void setThresholdValue(Double thresholdValue) {
+        this.thresholdValue = thresholdValue;
+    }
+
+    public String getValidationQuery() {
+        return validationQuery;
+    }
+
+    public void setValidationQuery(String validationQuery) {
+        this.validationQuery = validationQuery;
+    }
+
+    public String getErrorMessageTemplate() {
+        return errorMessageTemplate;
+    }
+
+    public void setErrorMessageTemplate(String errorMessageTemplate) {
+        this.errorMessageTemplate = errorMessageTemplate;
+    }
+
+    public String getRemediationGuidance() {
+        return remediationGuidance;
+    }
+
+    public void setRemediationGuidance(String remediationGuidance) {
+        this.remediationGuidance = remediationGuidance;
     }
 }

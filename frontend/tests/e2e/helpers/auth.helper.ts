@@ -142,6 +142,14 @@ export async function saveAuthState(page: Page, path: string): Promise<void> {
  * Clear authentication
  */
 export async function clearAuth(page: Page): Promise<void> {
+  // Navigate to a valid origin first to avoid "Access is denied" error
+  // This ensures localStorage is accessible before clearing
+  try {
+    await page.goto('http://localhost:3001', { waitUntil: 'domcontentloaded', timeout: 5000 });
+  } catch (error) {
+    // If navigation fails, continue anyway - localStorage might already be accessible
+  }
+
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();

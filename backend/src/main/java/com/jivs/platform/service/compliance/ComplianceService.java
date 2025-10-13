@@ -109,7 +109,7 @@ public class ComplianceService {
             result.setExportPath(exportPath);
 
             request.setStatus(ComplianceStatus.COMPLETED);
-            request.setCompletedDate(LocalDateTime.now());
+            request.setCompletedDate(java.time.LocalDate.now());
             request.setResultPath(exportPath);
 
             // Audit completion
@@ -204,7 +204,7 @@ public class ComplianceService {
             result.setErasedRecords(erasedCount);
 
             request.setStatus(ComplianceStatus.COMPLETED);
-            request.setCompletedDate(LocalDateTime.now());
+            request.setCompletedDate(java.time.LocalDate.now());
 
             // Audit completion
             auditService.logEvent("ERASURE_COMPLETED", requestId,
@@ -274,7 +274,7 @@ public class ComplianceService {
 
             result.setUpdatedRecords(updatedCount);
             request.setStatus(ComplianceStatus.COMPLETED);
-            request.setCompletedDate(LocalDateTime.now());
+            request.setCompletedDate(java.time.LocalDate.now());
 
             auditService.logEvent("RECTIFICATION_COMPLETED", requestId,
                 "Rectification completed. Updated: " + updatedCount);
@@ -385,7 +385,7 @@ public class ComplianceService {
 
         // Request statistics
         List<ComplianceRequest> requests = complianceRequestRepository
-            .findBySubmittedDateBetween(request.getStartDate(), request.getEndDate());
+            .findByCreatedAtBetween(request.getStartDate(), request.getEndDate());
 
         report.setTotalRequests(requests.size());
         report.setRequestsByType(groupByType(requests));
@@ -428,7 +428,7 @@ public class ComplianceService {
         try {
             // Check for overdue requests
             List<ComplianceRequest> overdueRequests = complianceRequestRepository
-                .findByStatusAndDueDateBefore(ComplianceStatus.IN_PROGRESS, LocalDateTime.now());
+                .findByStatusAndDueDateBefore(ComplianceStatus.IN_PROGRESS, java.time.LocalDate.now());
 
             for (ComplianceRequest request : overdueRequests) {
                 log.warn("Overdue compliance request: {} - {}", request.getId(), request.getRequestType());
@@ -492,10 +492,10 @@ public class ComplianceService {
         }
     }
 
-    private LocalDateTime calculateDueDate(Regulation regulation) {
+    private java.time.LocalDate calculateDueDate(Regulation regulation) {
         // GDPR: 30 days, CCPA: 45 days
         int days = regulation == Regulation.GDPR ? 30 : 45;
-        return LocalDateTime.now().plusDays(days);
+        return java.time.LocalDate.now().plusDays(days);
     }
 
     private boolean hasLegalHold(String email) {

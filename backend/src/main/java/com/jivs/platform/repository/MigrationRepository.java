@@ -1,7 +1,6 @@
 package com.jivs.platform.repository;
 
 import com.jivs.platform.domain.migration.Migration;
-import com.jivs.platform.domain.migration.MigrationPhase;
 import com.jivs.platform.domain.migration.MigrationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +15,7 @@ import java.util.Optional;
 
 /**
  * Repository interface for Migration entity
+ * Maps to migration_projects table
  */
 @Repository
 public interface MigrationRepository extends JpaRepository<Migration, Long> {
@@ -31,9 +31,14 @@ public interface MigrationRepository extends JpaRepository<Migration, Long> {
     Page<Migration> findByStatus(MigrationStatus status, Pageable pageable);
 
     /**
-     * Find migrations by phase
+     * Find migrations by project type
      */
-    List<Migration> findByPhase(MigrationPhase phase);
+    List<Migration> findByProjectType(String projectType);
+
+    /**
+     * Find migrations by priority
+     */
+    List<Migration> findByPriority(String priority);
 
     /**
      * Find migrations by source system
@@ -58,7 +63,7 @@ public interface MigrationRepository extends JpaRepository<Migration, Long> {
     /**
      * Find migrations created between dates
      */
-    List<Migration> findByCreatedDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+    List<Migration> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 
     /**
      * Find active migrations (in progress or paused)
@@ -69,22 +74,24 @@ public interface MigrationRepository extends JpaRepository<Migration, Long> {
     /**
      * Find failed migrations
      */
-    @Query("SELECT m FROM Migration m WHERE m.status = 'FAILED' ORDER BY m.createdDate DESC")
+    @Query("SELECT m FROM Migration m WHERE m.status = 'FAILED' ORDER BY m.createdAt DESC")
     List<Migration> findFailedMigrations();
 
     /**
-     * Find completed migrations in date range
+     * Find completed migrations
      */
-    @Query("SELECT m FROM Migration m WHERE m.status = 'COMPLETED' AND m.completionTime BETWEEN :startDate AND :endDate")
-    List<Migration> findCompletedMigrationsBetween(
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
-    );
+    @Query("SELECT m FROM Migration m WHERE m.status = 'COMPLETED' ORDER BY m.createdAt DESC")
+    List<Migration> findCompletedMigrations();
 
     /**
      * Count migrations by status
      */
     long countByStatus(MigrationStatus status);
+
+    /**
+     * Find migration by project code
+     */
+    Optional<Migration> findByProjectCode(String projectCode);
 
     /**
      * Find migration by name
@@ -97,19 +104,21 @@ public interface MigrationRepository extends JpaRepository<Migration, Long> {
     boolean existsByName(String name);
 
     /**
+     * Check if project code exists
+     */
+    boolean existsByProjectCode(String projectCode);
+
+    /**
      * Find recent migrations
      */
-    @Query("SELECT m FROM Migration m ORDER BY m.createdDate DESC")
+    @Query("SELECT m FROM Migration m ORDER BY m.createdAt DESC")
     Page<Migration> findRecentMigrations(Pageable pageable);
 
     /**
-     * Get migration statistics
+     * Get migration statistics - simplified version
+     * Note: Migration entity maps to migration_projects, not migration_jobs
+     * So we can only count projects, not records
      */
-    @Query("SELECT " +
-           "COUNT(m), " +
-           "SUM(m.metrics.totalRecords), " +
-           "SUM(m.metrics.successfulRecords), " +
-           "SUM(m.metrics.failedRecords) " +
-           "FROM Migration m WHERE m.status = :status")
-    Object[] getMigrationStatisticsByStatus(@Param("status") MigrationStatus status);
+    @Query("SELECT COUNT(m) FROM Migration m WHERE m.status = :status")
+    long getMigrationCountByStatus(@Param("status") MigrationStatus status);
 }

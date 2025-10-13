@@ -1,0 +1,53 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - main [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "JiVS Platform Login" [level=1] [ref=e9]
+      - paragraph [ref=e10]: Enterprise Data Management Platform
+      - alert [ref=e11]:
+        - img [ref=e13]
+        - generic [ref=e15]: Invalid username or password
+        - button "Close" [ref=e17] [cursor=pointer]:
+          - img [ref=e18]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - text: Username
+            - generic [ref=e23]: "*"
+          - generic [ref=e24]:
+            - textbox "Username" [ref=e25]: invalid_user
+            - group:
+              - generic: Username *
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - text: Password
+            - generic [ref=e28]: "*"
+          - generic [ref=e29]:
+            - textbox "Password" [ref=e30]: password
+            - button [ref=e32] [cursor=pointer]:
+              - img [ref=e33]
+            - group:
+              - generic: Password *
+        - generic [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]:
+            - checkbox "Remember me" [ref=e37]
+            - img [ref=e38]
+          - generic [ref=e40]: Remember me
+        - button "Sign In" [active] [ref=e41] [cursor=pointer]: Sign In
+        - generic [ref=e42]:
+          - link "Forgot password?" [ref=e44] [cursor=pointer]:
+            - /url: "#"
+          - link "Don't have an account? Contact Admin" [ref=e46] [cursor=pointer]:
+            - /url: "#"
+      - paragraph [ref=e47]: © 2025 JiVS Platform. All rights reserved.
+  - generic [ref=e49] [cursor=pointer]:
+    - alert [ref=e50]:
+      - img [ref=e52]
+      - generic [ref=e54]: Invalid username or password
+    - button "close" [ref=e55]:
+      - img [ref=e56]
+    - progressbar "notification timer" [ref=e58]
+```

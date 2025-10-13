@@ -16,22 +16,22 @@ import java.util.List;
 public interface DataQualityCheckRepository extends JpaRepository<DataQualityCheck, Long> {
 
     /**
-     * Find checks by report
-     */
-    List<DataQualityCheck> findByReport(DataQualityReport report);
-
-    /**
      * Find checks by rule
      */
     List<DataQualityCheck> findByRule(DataQualityRule rule);
 
     /**
-     * Find failed checks
+     * Find checks by status
      */
-    List<DataQualityCheck> findByPassed(boolean passed);
+    List<DataQualityCheck> findByCheckStatus(String checkStatus);
 
     /**
-     * Find checks within date range
+     * Find checks within start time range
      */
-    List<DataQualityCheck> findByExecutionTimeBetween(LocalDateTime start, LocalDateTime end);
+    List<DataQualityCheck> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Find checks within end time range
+     */
+    List<DataQualityCheck> findByEndTimeBetween(LocalDateTime start, LocalDateTime end);
 }

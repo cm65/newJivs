@@ -18,7 +18,7 @@ export function createTestMigration(overrides: Partial<MigrationConfig> = {}): M
   return {
     name: `E2E Test Migration ${timestamp}`,
     sourceConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'source-db',
       port: 5432,
       database: 'source_db',
@@ -26,7 +26,7 @@ export function createTestMigration(overrides: Partial<MigrationConfig> = {}): M
       password: 'source_pass',
     },
     targetConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'target-db',
       port: 5432,
       database: 'target_db',
@@ -54,23 +54,23 @@ export function createTestMigrations(count: number, overrides: Partial<Migration
  * Predefined test migration configurations
  */
 export const testMigrationConfigs = {
-  jdbcToJdbc: {
-    name: 'JDBC to JDBC Migration',
+  postgresqlToPostgresql: {
+    name: 'PostgreSQL to PostgreSQL Migration',
     sourceConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'postgres-source',
       port: 5432,
       database: 'legacy_db',
     },
     targetConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'postgres-target',
       port: 5432,
       database: 'modern_db',
     },
   },
-  sapToJdbc: {
-    name: 'SAP to JDBC Migration',
+  sapToPostgresql: {
+    name: 'SAP to PostgreSQL Migration',
     sourceConfig: {
       type: 'SAP',
       host: 'sap-server',
@@ -78,21 +78,21 @@ export const testMigrationConfigs = {
       systemNumber: '00',
     },
     targetConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'postgres-target',
       port: 5432,
       database: 'target_db',
     },
   },
-  fileToJdbc: {
-    name: 'File to JDBC Migration',
+  fileToPostgresql: {
+    name: 'File to PostgreSQL Migration',
     sourceConfig: {
       type: 'FILE',
       path: '/data/exports/customers.csv',
       format: 'CSV',
     },
     targetConfig: {
-      type: 'JDBC',
+      type: 'POSTGRESQL',
       host: 'postgres-target',
       port: 5432,
       database: 'target_db',

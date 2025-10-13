@@ -60,7 +60,7 @@ const Extractions: React.FC = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newExtraction, setNewExtraction] = useState<Partial<ExtractionConfig>>({
     name: '',
-    sourceType: 'JDBC',
+    sourceType: 'POSTGRESQL',
     connectionConfig: {},
   });
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | undefined>();
@@ -249,7 +249,7 @@ const Extractions: React.FC = () => {
     try {
       await extractionService.createExtraction(newExtraction as ExtractionConfig);
       setCreateDialogOpen(false);
-      setNewExtraction({ name: '', sourceType: 'JDBC', connectionConfig: {} });
+      setNewExtraction({ name: '', sourceType: 'POSTGRESQL', connectionConfig: {} });
       loadExtractions();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create extraction');
@@ -742,7 +742,10 @@ const Extractions: React.FC = () => {
                   setNewExtraction({ ...newExtraction, sourceType: e.target.value as any })
                 }
               >
-                <MenuItem value="JDBC">JDBC Database</MenuItem>
+                <MenuItem value="POSTGRESQL">PostgreSQL</MenuItem>
+                <MenuItem value="MYSQL">MySQL</MenuItem>
+                <MenuItem value="ORACLE">Oracle</MenuItem>
+                <MenuItem value="SQL_SERVER">SQL Server</MenuItem>
                 <MenuItem value="SAP">SAP System</MenuItem>
                 <MenuItem value="FILE">File System</MenuItem>
                 <MenuItem value="API">REST API</MenuItem>

@@ -14,6 +14,8 @@ set -e
 
 MODE="${1:---watch}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TEST_REPORT_LOG="${TEST_REPORT_LOG:-/tmp/continuous-test-report.log}"
+TEST_ALERT_LOG="${TEST_ALERT_LOG:-/tmp/test-alerts.log}"
 
 # Colors for terminal output
 RED='\033[0;31m'
@@ -23,30 +25,96 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Logging functions
-log_info() { echo -e "${BLUE}[$(date +%H:%M:%S)]${NC} $1"; }
-log_success() { echo -e "${GREEN}[$(date +%H:%M:%S)] ✅${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[$(date +%H:%M:%S)] ⚠️${NC} $1"; }
-log_error() { echo -e "${RED}[$(date +%H:%M:%S)] ❌${NC} $1"; }
-log_test() { echo -e "${CYAN}[$(date +%H:%M:%S)] 🧪${NC} $1"; }
+# Initialize logs on first run
+init_logs() {
+    if [ ! -f "$TEST_REPORT_LOG" ] || [ "$MODE" = "--watch" ]; then
+        echo "# JiVS Continuous Test Report - Started $(date '+%Y-%m-%d %H:%M:%S')" > "$TEST_REPORT_LOG"
+        echo "# Backend: http://localhost:8080" >> "$TEST_REPORT_LOG"
+        echo "# Frontend: http://localhost:3001" >> "$TEST_REPORT_LOG"
+        echo "" >> "$TEST_REPORT_LOG"
+    fi
+    if [ ! -f "$TEST_ALERT_LOG" ]; then
+        echo "# JiVS Test Alerts - Started $(date '+%Y-%m-%d %H:%M:%S')" > "$TEST_ALERT_LOG"
+        echo "" >> "$TEST_ALERT_LOG"
+    fi
+}
+
+# Logging functions with file output
+log_info() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${BLUE}[$(date +%H:%M:%S)]${NC} $msg"
+    echo "[$timestamp] INFO: $msg" >> "$TEST_REPORT_LOG"
+}
+
+log_success() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[$(date +%H:%M:%S)] ✅${NC} $msg"
+    echo "[$timestamp] SUCCESS: $msg" >> "$TEST_REPORT_LOG"
+}
+
+log_warning() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[$(date +%H:%M:%S)] ⚠️${NC} $msg"
+    echo "[$timestamp] WARNING: $msg" >> "$TEST_REPORT_LOG"
+}
+
+log_error() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[$(date +%H:%M:%S)] ❌${NC} $msg"
+    echo "[$timestamp] ERROR: $msg" >> "$TEST_REPORT_LOG"
+    echo "[$timestamp] ERROR: $msg" >> "$TEST_ALERT_LOG"
+}
+
+log_test() {
+    local msg="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${CYAN}[$(date +%H:%M:%S)] 🧪${NC} $msg"
+    echo "[$timestamp] TEST: $msg" >> "$TEST_REPORT_LOG"
+}
+
+log_metric() {
+    local test_name="$1"
+    local status="$2"
+    local response_time="${3:-N/A}"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] METRIC: $test_name | Status: $status | ResponseTime: ${response_time}ms" >> "$TEST_REPORT_LOG"
+}
 
 # Check if services are running
 check_services() {
     local all_up=true
 
-    # Check frontend
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3001 | grep -q "200"; then
-        log_success "Frontend running (port 3001)"
+    # Check frontend with timing
+    local start_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+    local frontend_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001 --max-time 5 2>/dev/null || echo "000")
+    local end_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+    local frontend_time=$((end_time - start_time))
+
+    if [ "$frontend_code" = "200" ]; then
+        log_success "Frontend running (port 3001, ${frontend_time}ms)"
+        log_metric "frontend_health" "UP" "$frontend_time"
     else
         log_warning "Frontend not running (port 3001)"
+        log_metric "frontend_health" "DOWN" "0"
         all_up=false
     fi
 
-    # Check backend
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health | grep -q "200"; then
-        log_success "Backend running (port 8080)"
+    # Check backend with timing
+    start_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+    local backend_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health --max-time 5 2>/dev/null || echo "000")
+    end_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+    local backend_time=$((end_time - start_time))
+
+    if [ "$backend_code" = "200" ]; then
+        log_success "Backend running (port 8080, ${backend_time}ms)"
+        log_metric "backend_health" "UP" "$backend_time"
     else
         log_warning "Backend not running (port 8080)"
+        log_metric "backend_health" "DOWN" "0"
         all_up=false
     fi
 
@@ -100,19 +168,25 @@ test_build() {
 test_critical_apis() {
     log_test "Testing critical APIs..."
 
-    # Get auth token
+    # Get auth token with timing
+    local start_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
     local token_response=$(curl -s http://localhost:8080/api/v1/auth/login \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"password"}')
+        -d '{"username":"admin","password":"password"}' \
+        --max-time 10)
+    local end_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+    local auth_time=$((end_time - start_time))
 
-    local token=$(echo "$token_response" | jq -r '.data.accessToken // empty')
+    local token=$(echo "$token_response" | jq -r '.data.accessToken // empty' 2>/dev/null)
 
     if [ -z "$token" ]; then
-        log_error "  Authentication FAILED"
+        log_error "  Authentication FAILED (${auth_time}ms)"
+        log_metric "api_authentication" "FAILED" "$auth_time"
         return 1
     fi
 
-    log_success "  Authentication passed"
+    log_success "  Authentication passed (${auth_time}ms)"
+    log_metric "api_authentication" "SUCCESS" "$auth_time"
 
     # Test critical endpoints
     local endpoints=(
@@ -127,14 +201,22 @@ test_critical_apis() {
     for endpoint_info in "${endpoints[@]}"; do
         IFS=':' read -r endpoint description <<< "$endpoint_info"
 
+        start_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
         local status=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $token" \
-            "http://localhost:8080/api/v1${endpoint}")
+            "http://localhost:8080/api/v1${endpoint}" \
+            --max-time 10)
+        end_time=$(gdate +%s%3N 2>/dev/null || date +%s000)
+        local endpoint_time=$((end_time - start_time))
+
+        local endpoint_name=$(echo "$endpoint" | sed 's/[^a-zA-Z0-9]/_/g')
 
         if [ "$status" = "200" ]; then
-            log_success "  $description → 200 OK"
+            log_success "  $description → 200 OK (${endpoint_time}ms)"
+            log_metric "api${endpoint_name}" "SUCCESS" "$endpoint_time"
         else
-            log_error "  $description → $status FAILED"
+            log_error "  $description → $status FAILED (${endpoint_time}ms)"
+            log_metric "api${endpoint_name}" "FAILED" "$endpoint_time"
             failed=true
         fi
     done
@@ -458,6 +540,9 @@ quick_mode() {
     exit 0
 }
 
+# Initialize logs
+init_logs
+
 # Main execution
 case "$MODE" in
     --watch)
@@ -472,6 +557,16 @@ case "$MODE" in
     --quick)
         quick_mode
         ;;
+    --status)
+        # Show current status
+        check_services
+        echo ""
+        show_status
+        echo ""
+        log_info "Report log: $TEST_REPORT_LOG"
+        log_info "Alert log: $TEST_ALERT_LOG"
+        exit 0
+        ;;
     --help|-h)
         echo "JiVS Continuous Tester"
         echo ""
@@ -480,7 +575,12 @@ case "$MODE" in
         echo "  $0 --pre-commit  Run pre-commit validation (blocks bad commits)"
         echo "  $0 --full        Run complete test suite (15-20 min)"
         echo "  $0 --quick       Run quick smoke tests (< 2 min)"
+        echo "  $0 --status      Show current health status"
         echo "  $0 --help        Show this help message"
+        echo ""
+        echo "Logs:"
+        echo "  Test Report: $TEST_REPORT_LOG"
+        echo "  Test Alerts: $TEST_ALERT_LOG"
         echo ""
         exit 0
         ;;

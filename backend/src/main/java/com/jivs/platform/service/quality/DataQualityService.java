@@ -529,7 +529,8 @@ public class DataQualityService {
     }
 
     private List<DataQualityRule> getApplicableRules(String datasetType) {
-        return ruleRepository.findByDatasetTypeAndActive(datasetType, true);
+        // Note: datasetType is not in DB schema, so we get all active rules
+        return ruleRepository.findByActive(true);
     }
 
     private List<Long> getDatasetsPendingQualityCheck() {

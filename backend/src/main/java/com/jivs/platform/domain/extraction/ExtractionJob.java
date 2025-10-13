@@ -33,8 +33,8 @@ public class ExtractionJob {
     private String jobId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "data_source_id")
-    private DataSource dataSource;
+    @JoinColumn(name = "extraction_config_id", nullable = false)
+    private ExtractionConfig extractionConfig;
 
     @Column(nullable = false, length = 50)
     @Enumerated(EnumType.STRING)
@@ -61,19 +61,11 @@ public class ExtractionJob {
     @Column(name = "error_stack_trace", columnDefinition = "TEXT")
     private String errorStackTrace;
 
-    @ElementCollection
-    @CollectionTable(name = "extraction_job_params",
-                     joinColumns = @JoinColumn(name = "extraction_job_id"))
-    @MapKeyColumn(name = "param_key")
-    @Column(name = "param_value")
-    private Map<String, String> extractionParams = new HashMap<>();
+    @Column(name = "extraction_params", columnDefinition = "jsonb")
+    private String extractionParamsJson;
 
-    @ElementCollection
-    @CollectionTable(name = "extraction_job_context",
-                     joinColumns = @JoinColumn(name = "extraction_job_id"))
-    @MapKeyColumn(name = "context_key")
-    @Column(name = "context_value")
-    private Map<String, String> executionContext = new HashMap<>();
+    @Column(name = "execution_context", columnDefinition = "jsonb")
+    private String executionContextJson;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -85,6 +77,16 @@ public class ExtractionJob {
 
     @Column(name = "triggered_by", length = 50)
     private String triggeredBy;
+
+    // @Transient fields for backward compatibility
+    @Transient
+    private DataSource dataSource;
+
+    @Transient
+    private Map<String, String> extractionParams = new HashMap<>();
+
+    @Transient
+    private Map<String, String> executionContext = new HashMap<>();
 
     // Getters and Setters
     public Long getId() {
@@ -103,12 +105,12 @@ public class ExtractionJob {
         this.jobId = jobId;
     }
 
-    public DataSource getDataSource() {
-        return dataSource;
+    public ExtractionConfig getExtractionConfig() {
+        return extractionConfig;
     }
 
-    public void setDataSource(DataSource dataSource) {
-        this.dataSource = dataSource;
+    public void setExtractionConfig(ExtractionConfig extractionConfig) {
+        this.extractionConfig = extractionConfig;
     }
 
     public JobStatus getStatus() {
@@ -175,6 +177,24 @@ public class ExtractionJob {
         this.errorStackTrace = errorStackTrace;
     }
 
+    // Database JSON fields getters/setters
+    public String getExtractionParamsJson() {
+        return extractionParamsJson;
+    }
+
+    public void setExtractionParamsJson(String extractionParamsJson) {
+        this.extractionParamsJson = extractionParamsJson;
+    }
+
+    public String getExecutionContextJson() {
+        return executionContextJson;
+    }
+
+    public void setExecutionContextJson(String executionContextJson) {
+        this.executionContextJson = executionContextJson;
+    }
+
+    // Backward compatibility - @Transient Map getters/setters
     public Map<String, String> getExtractionParams() {
         return extractionParams;
     }
@@ -189,6 +209,15 @@ public class ExtractionJob {
 
     public void setExecutionContext(Map<String, String> executionContext) {
         this.executionContext = executionContext;
+    }
+
+    // Backward compatibility - DataSource getter/setter
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     public LocalDateTime getCreatedAt() {

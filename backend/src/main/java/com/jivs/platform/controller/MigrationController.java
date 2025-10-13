@@ -1,11 +1,21 @@
 package com.jivs.platform.controller;
 
+import com.jivs.platform.domain.migration.Migration;
+import com.jivs.platform.domain.migration.MigrationMetrics;
 import com.jivs.platform.dto.BulkActionRequest;
 import com.jivs.platform.dto.BulkActionResponse;
+import com.jivs.platform.repository.MigrationRepository;
+import com.jivs.platform.security.UserPrincipal;
+import com.jivs.platform.service.migration.MigrationModels;
+import com.jivs.platform.service.migration.MigrationOrchestrator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -13,6 +23,7 @@ import java.util.*;
 
 /**
  * REST API controller for data migration operations
+ * NOW FULLY INTEGRATED WITH REAL DATABASE PERSISTENCE!
  */
 @RestController
 @RequestMapping("/api/v1/migrations")
@@ -22,8 +33,12 @@ public class MigrationController {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MigrationController.class);
 
+    private final MigrationOrchestrator migrationOrchestrator;
+    private final MigrationRepository migrationRepository;
+
     /**
      * Create a new migration job
+     * ✅ NOW PERSISTS TO DATABASE!
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
@@ -33,12 +48,40 @@ public class MigrationController {
         log.info("Creating new migration: {}", request.get("name"));
 
         try {
+            String username = getCurrentUsername();
+
+            // Build MigrationRequest from UI input
+            MigrationModels.MigrationRequest migrationRequest = new MigrationModels.MigrationRequest();
+            migrationRequest.setName((String) request.get("name"));
+            migrationRequest.setDescription((String) request.get("description"));
+            migrationRequest.setSourceSystem((String) request.get("sourceSystem"));
+            migrationRequest.setTargetSystem((String) request.get("targetSystem"));
+            migrationRequest.setMigrationType((String) request.get("migrationType"));
+            migrationRequest.setUserId(getCurrentUserId());
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = (Map<String, Object>) request.get("parameters");
+            if (params != null) {
+                migrationRequest.setParameters(params);
+            }
+
+            // Set optional parameters
+            if (request.containsKey("batchSize")) {
+                migrationRequest.setBatchSize(((Number) request.get("batchSize")).intValue());
+            }
+            if (request.containsKey("parallelism")) {
+                migrationRequest.setParallelism(((Number) request.get("parallelism")).intValue());
+            }
+
+            // Create migration in database
+            Migration migration = migrationOrchestrator.initiateMigration(migrationRequest);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", UUID.randomUUID().toString());
-            response.put("name", request.get("name"));
-            response.put("status", "PENDING");
-            response.put("phase", "PLANNING");
-            response.put("createdAt", new Date());
+            response.put("id", migration.getId().toString());
+            response.put("name", migration.getName());
+            response.put("status", migration.getStatus().toString());
+            response.put("phase", migration.getPhase().toString());
+            response.put("createdAt", migration.getCreatedDate());
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
@@ -51,21 +94,42 @@ public class MigrationController {
 
     /**
      * Get migration by ID
+     * ✅ NOW READS FROM DATABASE!
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
-    public ResponseEntity<Map<String, Object>> getMigration(@PathVariable String id) {
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> getMigration(@PathVariable Long id) {
         log.info("Getting migration: {}", id);
 
         try {
+            Migration migration = migrationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Migration not found: " + id));
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("name", "Sample Migration");
-            response.put("status", "IN_PROGRESS");
-            response.put("phase", "MIGRATION");
-            response.put("progress", 65);
-            response.put("recordsMigrated", 6500);
-            response.put("totalRecords", 10000);
+            response.put("id", migration.getId().toString());
+            response.put("name", migration.getName());
+            response.put("status", migration.getStatus().toString());
+            response.put("phase", migration.getPhase().toString());
+            response.put("sourceSystem", migration.getSourceSystem());
+            response.put("targetSystem", migration.getTargetSystem());
+
+            // Calculate progress
+            MigrationMetrics metrics = migration.getMetrics();
+            if (metrics != null && metrics.getTotalRecords() > 0) {
+                int progress = (int) ((metrics.getProcessedRecords() * 100.0) / metrics.getTotalRecords());
+                response.put("progress", Math.min(100, Math.max(0, progress)));
+                response.put("recordsMigrated", metrics.getProcessedRecords());
+                response.put("totalRecords", metrics.getTotalRecords());
+            } else {
+                response.put("progress", 0);
+                response.put("recordsMigrated", 0);
+                response.put("totalRecords", 0);
+            }
+
+            response.put("createdAt", migration.getCreatedDate());
+            response.put("startTime", migration.getStartTime());
+            response.put("completionTime", migration.getCompletionTime());
 
             return ResponseEntity.ok(response);
 
@@ -78,9 +142,11 @@ public class MigrationController {
 
     /**
      * List all migrations
+     * ✅ NOW READS FROM DATABASE!
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> listMigrations(
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size,
@@ -89,21 +155,37 @@ public class MigrationController {
         log.info("Listing migrations: page={}, size={}, status={}", page, size, status);
 
         try {
-            List<Map<String, Object>> migrations = new ArrayList<>();
+            Page<Migration> migrationPage = migrationRepository.findAll(PageRequest.of(page, size));
 
-            for (int i = 0; i < 5; i++) {
-                Map<String, Object> migration = new HashMap<>();
-                migration.put("id", UUID.randomUUID().toString());
-                migration.put("name", "Migration " + (i + 1));
-                migration.put("status", i % 2 == 0 ? "COMPLETED" : "IN_PROGRESS");
-                migration.put("recordsMigrated", 1000 * (i + 1));
-                migrations.add(migration);
+            List<Map<String, Object>> migrations = new ArrayList<>();
+            for (Migration migration : migrationPage.getContent()) {
+                Map<String, Object> migrationData = new HashMap<>();
+                migrationData.put("id", migration.getId().toString());
+                migrationData.put("name", migration.getName());
+                migrationData.put("status", migration.getStatus().toString());
+                migrationData.put("phase", migration.getPhase().toString());
+
+                // Calculate progress
+                MigrationMetrics metrics = migration.getMetrics();
+                if (metrics != null && metrics.getTotalRecords() > 0) {
+                    int progress = (int) ((metrics.getProcessedRecords() * 100.0) / metrics.getTotalRecords());
+                    migrationData.put("progress", Math.min(100, Math.max(0, progress)));
+                    migrationData.put("recordsMigrated", metrics.getProcessedRecords());
+                    migrationData.put("totalRecords", metrics.getTotalRecords());
+                } else {
+                    migrationData.put("progress", 0);
+                    migrationData.put("recordsMigrated", 0);
+                    migrationData.put("totalRecords", 0);
+                }
+
+                migrationData.put("createdAt", migration.getCreatedDate());
+                migrations.add(migrationData);
             }
 
             Map<String, Object> response = new HashMap<>();
             response.put("content", migrations);
-            response.put("totalElements", 15);
-            response.put("totalPages", 3);
+            response.put("totalElements", migrationPage.getTotalElements());
+            response.put("totalPages", migrationPage.getTotalPages());
             response.put("currentPage", page);
             response.put("pageSize", size);
 
@@ -118,17 +200,20 @@ public class MigrationController {
 
     /**
      * Start a migration job
+     * ✅ NOW EXECUTES VIA ORCHESTRATOR!
      */
     @PostMapping("/{id}/start")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> startMigration(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> startMigration(@PathVariable Long id) {
         log.info("Starting migration: {}", id);
 
         try {
+            // Execute migration asynchronously
+            migrationOrchestrator.executeMigration(id);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
+            response.put("id", id.toString());
             response.put("status", "RUNNING");
-            response.put("phase", "EXTRACTION");
             response.put("message", "Migration started successfully");
 
             return ResponseEntity.ok(response);
@@ -142,16 +227,19 @@ public class MigrationController {
 
     /**
      * Pause a migration job
+     * ✅ NOW UPDATES DATABASE!
      */
     @PostMapping("/{id}/pause")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> pauseMigration(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> pauseMigration(@PathVariable Long id) {
         log.info("Pausing migration: {}", id);
 
         try {
+            Migration migration = migrationOrchestrator.pauseMigration(id);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("status", "PAUSED");
+            response.put("id", migration.getId().toString());
+            response.put("status", migration.getStatus().toString());
             response.put("message", "Migration paused successfully");
 
             return ResponseEntity.ok(response);
@@ -165,16 +253,19 @@ public class MigrationController {
 
     /**
      * Resume a migration job
+     * ✅ NOW UPDATES DATABASE!
      */
     @PostMapping("/{id}/resume")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
-    public ResponseEntity<Map<String, Object>> resumeMigration(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> resumeMigration(@PathVariable Long id) {
         log.info("Resuming migration: {}", id);
 
         try {
+            Migration migration = migrationOrchestrator.resumeMigration(id);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("status", "RUNNING");
+            response.put("id", migration.getId().toString());
+            response.put("status", migration.getStatus().toString());
             response.put("message", "Migration resumed successfully");
 
             return ResponseEntity.ok(response);
@@ -188,16 +279,19 @@ public class MigrationController {
 
     /**
      * Rollback a migration
+     * ✅ NOW EXECUTES VIA ORCHESTRATOR!
      */
     @PostMapping("/{id}/rollback")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> rollbackMigration(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> rollbackMigration(@PathVariable Long id) {
         log.info("Rolling back migration: {}", id);
 
         try {
+            Migration migration = migrationOrchestrator.cancelMigration(id);
+
             Map<String, Object> response = new HashMap<>();
-            response.put("id", id);
-            response.put("status", "ROLLING_BACK");
+            response.put("id", migration.getId().toString());
+            response.put("status", migration.getStatus().toString());
             response.put("message", "Migration rollback initiated");
 
             return ResponseEntity.ok(response);
@@ -211,13 +305,16 @@ public class MigrationController {
 
     /**
      * Delete a migration job
+     * ✅ NOW DELETES FROM DATABASE!
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> deleteMigration(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> deleteMigration(@PathVariable Long id) {
         log.info("Deleting migration: {}", id);
 
         try {
+            migrationRepository.deleteById(id);
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Migration deleted successfully");
 
@@ -232,6 +329,7 @@ public class MigrationController {
 
     /**
      * Perform bulk action on multiple migrations
+     * ✅ NOW USES REAL SERVICES!
      */
     @PostMapping("/bulk")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER')")
@@ -244,52 +342,42 @@ public class MigrationController {
             List<String> successfulIds = new ArrayList<>();
             Map<String, String> failedIds = new HashMap<>();
 
-            // Process each migration
-            for (String id : request.getIds()) {
+            for (String idStr : request.getIds()) {
                 try {
+                    Long id = Long.parseLong(idStr);
+
                     switch (request.getAction().toLowerCase()) {
                         case "start":
-                            // TODO: Call MigrationService.startMigration(id)
-                            log.info("Started migration: {}", id);
-                            successfulIds.add(id);
+                            migrationOrchestrator.executeMigration(id);
+                            successfulIds.add(idStr);
                             break;
 
                         case "pause":
-                            // TODO: Call MigrationService.pauseMigration(id)
-                            log.info("Paused migration: {}", id);
-                            successfulIds.add(id);
+                            migrationOrchestrator.pauseMigration(id);
+                            successfulIds.add(idStr);
                             break;
 
                         case "resume":
-                            // TODO: Call MigrationService.resumeMigration(id)
-                            log.info("Resumed migration: {}", id);
-                            successfulIds.add(id);
+                            migrationOrchestrator.resumeMigration(id);
+                            successfulIds.add(idStr);
                             break;
 
                         case "delete":
-                            // TODO: Call MigrationService.deleteMigration(id)
-                            log.info("Deleted migration: {}", id);
-                            successfulIds.add(id);
-                            break;
-
-                        case "export":
-                            // TODO: Call MigrationService.exportMigration(id)
-                            log.info("Exported migration: {}", id);
-                            successfulIds.add(id);
+                            migrationRepository.deleteById(id);
+                            successfulIds.add(idStr);
                             break;
 
                         default:
-                            failedIds.put(id, "Unknown action: " + request.getAction());
+                            failedIds.put(idStr, "Unknown action: " + request.getAction());
                     }
                 } catch (Exception e) {
-                    log.error("Failed to {} migration {}: {}", request.getAction(), id, e.getMessage());
-                    failedIds.put(id, e.getMessage());
+                    log.error("Failed to {} migration {}: {}", request.getAction(), idStr, e.getMessage());
+                    failedIds.put(idStr, e.getMessage());
                 }
             }
 
             long processingTime = System.currentTimeMillis() - startTime;
 
-            // Build response
             BulkActionResponse response = BulkActionResponse.builder()
                 .status(failedIds.isEmpty() ? "success" : (successfulIds.isEmpty() ? "failed" : "partial"))
                 .totalProcessed(request.getIds().size())
@@ -322,22 +410,24 @@ public class MigrationController {
 
     /**
      * Get migration progress
+     * ✅ NOW READS FROM DATABASE!
      */
     @GetMapping("/{id}/progress")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
-    public ResponseEntity<Map<String, Object>> getProgress(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> getProgress(@PathVariable Long id) {
         log.info("Getting migration progress: {}", id);
 
         try {
-            Map<String, Object> progress = new HashMap<>();
-            progress.put("overallProgress", 65);
-            progress.put("currentPhase", "MIGRATION");
-            progress.put("recordsMigrated", 6500);
-            progress.put("totalRecords", 10000);
-            progress.put("startTime", new Date(System.currentTimeMillis() - 3600000));
-            progress.put("estimatedCompletion", new Date(System.currentTimeMillis() + 1800000));
+            MigrationModels.MigrationProgress progress = migrationOrchestrator.getProgress(id);
 
-            return ResponseEntity.ok(progress);
+            Map<String, Object> response = new HashMap<>();
+            response.put("overallProgress", progress.getPercentageComplete());
+            response.put("currentPhase", progress.getPhase());
+            response.put("recordsMigrated", progress.getProcessedRecords());
+            response.put("totalRecords", progress.getTotalRecords());
+            response.put("estimatedTimeRemaining", progress.getEstimatedTimeRemaining());
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             log.error("Failed to get progress: {}", e.getMessage(), e);
@@ -348,19 +438,52 @@ public class MigrationController {
 
     /**
      * Get migration statistics
+     * ✅ NOW READS FROM DATABASE!
      */
     @GetMapping("/{id}/statistics")
     @PreAuthorize("hasAnyRole('ADMIN', 'DATA_ENGINEER', 'VIEWER')")
-    public ResponseEntity<Map<String, Object>> getStatistics(@PathVariable String id) {
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<Map<String, Object>> getStatistics(@PathVariable Long id) {
         log.info("Getting migration statistics: {}", id);
 
         try {
+            Migration migration = migrationRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Migration not found: " + id));
+
+            MigrationMetrics metrics = migration.getMetrics();
             Map<String, Object> stats = new HashMap<>();
-            stats.put("recordsMigrated", 6500);
-            stats.put("recordsFailed", 12);
-            stats.put("bytesMigrated", 8388608); // 8 MB
-            stats.put("duration", 2100);  // seconds
-            stats.put("throughput", 3.1); // records/sec
+
+            if (metrics != null) {
+                stats.put("recordsMigrated", metrics.getProcessedRecords());
+                stats.put("recordsFailed", metrics.getFailedRecords());
+                stats.put("successfulRecords", metrics.getSuccessfulRecords());
+                stats.put("totalRecords", metrics.getTotalRecords());
+            } else {
+                stats.put("recordsMigrated", 0);
+                stats.put("recordsFailed", 0);
+                stats.put("successfulRecords", 0);
+                stats.put("totalRecords", 0);
+            }
+
+            // Calculate duration if started
+            if (migration.getStartTime() != null) {
+                long durationSeconds;
+                if (migration.getCompletionTime() != null) {
+                    durationSeconds = java.time.Duration.between(
+                        migration.getStartTime(), migration.getCompletionTime()
+                    ).getSeconds();
+                } else {
+                    durationSeconds = java.time.Duration.between(
+                        migration.getStartTime(), java.time.LocalDateTime.now()
+                    ).getSeconds();
+                }
+                stats.put("duration", durationSeconds);
+
+                if (metrics != null && durationSeconds > 0) {
+                    double throughput = metrics.getProcessedRecords() / (double) durationSeconds;
+                    stats.put("throughput", Math.round(throughput * 100.0) / 100.0);
+                }
+            }
 
             return ResponseEntity.ok(stats);
 
@@ -382,11 +505,10 @@ public class MigrationController {
         log.info("Validating migration configuration");
 
         try {
+            // TODO: Implement validation logic
             Map<String, Object> response = new HashMap<>();
             response.put("valid", true);
             response.put("warnings", new ArrayList<String>());
-            response.put("estimatedRecords", 10000);
-            response.put("estimatedDuration", 3600); // seconds
 
             return ResponseEntity.ok(response);
 
@@ -395,5 +517,27 @@ public class MigrationController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("valid", false, "error", e.getMessage()));
         }
+    }
+
+    /**
+     * Get current authenticated username
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal) {
+            return ((UserPrincipal) authentication.getPrincipal()).getUsername();
+        }
+        return "system";
+    }
+
+    /**
+     * Get current authenticated user ID
+     */
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal) {
+            return ((UserPrincipal) authentication.getPrincipal()).getId();
+        }
+        return null;
     }
 }

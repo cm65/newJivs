@@ -14,11 +14,6 @@ import java.util.List;
 public interface DataQualityRuleRepository extends JpaRepository<DataQualityRule, Long> {
 
     /**
-     * Find active rules by dataset type
-     */
-    List<DataQualityRule> findByDatasetTypeAndActive(String datasetType, boolean active);
-
-    /**
      * Find rules by type
      */
     List<DataQualityRule> findByRuleType(RuleType ruleType);
@@ -27,9 +22,4 @@ public interface DataQualityRuleRepository extends JpaRepository<DataQualityRule
      * Find all active rules
      */
     List<DataQualityRule> findByActive(boolean active);
-
-    /**
-     * Find rules by dataset type
-     */
-    List<DataQualityRule> findByDatasetType(String datasetType);
 }
