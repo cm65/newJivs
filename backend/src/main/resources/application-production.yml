@@ -101,3 +101,8 @@ jivs:
   migration:
     max-parallel-jobs: 2      # Reduced for free tier
     checkpoint-interval: 1000
+
+# Server configuration for Render.com
+server:
+  address: 0.0.0.0  # Bind to all network interfaces
+  port: ${PORT:8080}  # Use Render's PORT environment variable
