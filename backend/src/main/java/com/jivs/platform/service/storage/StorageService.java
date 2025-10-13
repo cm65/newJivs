@@ -223,7 +223,7 @@ public class StorageService {
                     return listLocalFiles(directory);
                 case S3:
                     return listS3Files(directory);
-                case AZURE_BLOB:
+                case AZURE:
                     return listAzureFiles(directory);
                 case GCS:
                     return listGcsFiles(directory);
@@ -465,7 +465,7 @@ public class StorageService {
                 return storeToLocal(storageId, data, options);
             case S3:
                 return storeToS3(storageId, data, options);
-            case AZURE_BLOB:
+            case AZURE:
                 return storeToAzure(storageId, data, options);
             case GCS:
                 return storeToGcs(storageId, data, options);
@@ -524,7 +524,7 @@ public class StorageService {
             case S3:
                 // TODO: Implement S3 retrieval
                 return new byte[0];
-            case AZURE_BLOB:
+            case AZURE:
                 // TODO: Implement Azure retrieval
                 return new byte[0];
             case GCS:
@@ -546,7 +546,7 @@ public class StorageService {
             case S3:
                 // TODO: Implement S3 deletion
                 break;
-            case AZURE_BLOB:
+            case AZURE:
                 // TODO: Implement Azure deletion
                 break;
             case GCS:
@@ -647,127 +647,4 @@ public class StorageService {
             return "";
         }
     }
-}
-
-/**
- * Storage result
- */
-class StorageResult {
-    private String storageId;
-    private String originalFilename;
-    private String path;
-    private long size;
-    private String contentType;
-    private String checksum;
-    private boolean encrypted;
-    private StorageLocation location;
-    private Date uploadTimestamp;
-
-    // Getters and setters
-    public String getStorageId() { return storageId; }
-    public void setStorageId(String storageId) { this.storageId = storageId; }
-    public String getOriginalFilename() { return originalFilename; }
-    public void setOriginalFilename(String originalFilename) { this.originalFilename = originalFilename; }
-    public String getPath() { return path; }
-    public void setPath(String path) { this.path = path; }
-    public long getSize() { return size; }
-    public void setSize(long size) { this.size = size; }
-    public String getContentType() { return contentType; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
-    public String getChecksum() { return checksum; }
-    public void setChecksum(String checksum) { this.checksum = checksum; }
-    public boolean isEncrypted() { return encrypted; }
-    public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
-    public StorageLocation getLocation() { return location; }
-    public void setLocation(StorageLocation location) { this.location = location; }
-    public Date getUploadTimestamp() { return uploadTimestamp; }
-    public void setUploadTimestamp(Date uploadTimestamp) { this.uploadTimestamp = uploadTimestamp; }
-}
-
-/**
- * Storage options
- */
-class StorageOptions {
-    private StorageLocation location;
-    private String directory;
-    private boolean encrypted;
-    private Map<String, String> metadata;
-
-    // Getters and setters
-    public StorageLocation getLocation() { return location; }
-    public void setLocation(StorageLocation location) { this.location = location; }
-    public String getDirectory() { return directory; }
-    public void setDirectory(String directory) { this.directory = directory; }
-    public boolean isEncrypted() { return encrypted; }
-    public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
-    public Map<String, String> getMetadata() { return metadata; }
-    public void setMetadata(Map<String, String> metadata) { this.metadata = metadata; }
-}
-
-/**
- * File data
- */
-class FileData {
-    private String storageId;
-    private String filename;
-    private byte[] data;
-    private String contentType;
-    private long size;
-
-    // Getters and setters
-    public String getStorageId() { return storageId; }
-    public void setStorageId(String storageId) { this.storageId = storageId; }
-    public String getFilename() { return filename; }
-    public void setFilename(String filename) { this.filename = filename; }
-    public byte[] getData() { return data; }
-    public void setData(byte[] data) { this.data = data; }
-    public String getContentType() { return contentType; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
-    public long getSize() { return size; }
-    public void setSize(long size) { this.size = size; }
-}
-
-/**
- * Storage metadata
- */
-class StorageMetadata {
-    private String storageId;
-    private String originalFilename;
-    private String path;
-    private long size;
-    private String contentType;
-    private String checksum;
-    private boolean encrypted;
-    private StorageLocation location;
-    private Date uploadTimestamp;
-
-    // Getters and setters
-    public String getStorageId() { return storageId; }
-    public void setStorageId(String storageId) { this.storageId = storageId; }
-    public String getOriginalFilename() { return originalFilename; }
-    public void setOriginalFilename(String originalFilename) { this.originalFilename = originalFilename; }
-    public String getPath() { return path; }
-    public void setPath(String path) { this.path = path; }
-    public long getSize() { return size; }
-    public void setSize(long size) { this.size = size; }
-    public String getContentType() { return contentType; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
-    public String getChecksum() { return checksum; }
-    public void setChecksum(String checksum) { this.checksum = checksum; }
-    public boolean isEncrypted() { return encrypted; }
-    public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
-    public StorageLocation getLocation() { return location; }
-    public void setLocation(StorageLocation location) { this.location = location; }
-    public Date getUploadTimestamp() { return uploadTimestamp; }
-    public void setUploadTimestamp(Date uploadTimestamp) { this.uploadTimestamp = uploadTimestamp; }
-}
-
-/**
- * Storage locations
- */
-enum StorageLocation {
-    LOCAL,
-    S3,
-    AZURE_BLOB,
-    GCS
 }

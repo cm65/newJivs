@@ -1,5 +1,7 @@
 package com.jivs.platform.service.search;
 
+import com.jivs.platform.domain.Document;
+import com.jivs.platform.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -8,13 +10,14 @@ import java.util.stream.Collectors;
 
 /**
  * Service for full-text search across all platform entities
- * Integrates with Elasticsearch for fast, scalable search
+ * Uses database search as fallback when Elasticsearch is not available
  */
 @Service
 @RequiredArgsConstructor
 public class SearchService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SearchService.class);
+    private final DocumentRepository documentRepository;
 
     /**
      * Search across all entities
@@ -215,25 +218,110 @@ public class SearchService {
     }
 
     /**
-     * Execute search in Elasticsearch
+     * Execute search using database queries
+     * Falls back to database search when Elasticsearch is not available
      */
     private List<SearchResult> executeSearch(String query, SearchRequest request) {
-        // TODO: Execute Elasticsearch search
         List<SearchResult> results = new ArrayList<>();
 
-        // Dummy data for now
-        for (int i = 0; i < 10; i++) {
-            SearchResult result = new SearchResult();
-            result.setId("doc-" + i);
-            result.setType(request.getEntityType());
-            result.setTitle("Sample Document " + i);
-            result.setDescription("Description for document " + i);
-            result.setScore(1.0 - (i * 0.1));
-            result.setData(new HashMap<>());
-            results.add(result);
+        try {
+            // For DOCUMENT entity type, search in documents table
+            if (request.getEntityType() == EntityType.DOCUMENT) {
+                List<Document> documents = searchDocumentsInDatabase(query);
+
+                for (Document doc : documents) {
+                    SearchResult result = new SearchResult();
+                    result.setId(String.valueOf(doc.getId()));
+                    result.setType(EntityType.DOCUMENT);
+                    result.setTitle(doc.getTitle() != null ? doc.getTitle() : doc.getFilename());
+                    result.setDescription(doc.getDescription());
+                    result.setScore(calculateRelevanceScore(doc, query));
+                    result.setCreatedDate(doc.getCreatedDate());
+
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("filename", doc.getFilename());
+                    data.put("fileType", doc.getFileType());
+                    data.put("size", doc.getSize());
+                    data.put("archived", doc.isArchived());
+                    result.setData(data);
+
+                    results.add(result);
+                }
+            }
+            // TODO: Add support for other entity types (EXTRACTION, MIGRATION, etc.)
+
+        } catch (Exception e) {
+            log.error("Database search failed: {}", e.getMessage(), e);
         }
 
         return results;
+    }
+
+    /**
+     * Search documents in database using LIKE queries
+     */
+    private List<Document> searchDocumentsInDatabase(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            // Return recent documents if no query
+            return documentRepository.findAll()
+                .stream()
+                .limit(20)
+                .collect(Collectors.toList());
+        }
+
+        String searchPattern = "%" + query.toLowerCase() + "%";
+        List<Document> allDocs = documentRepository.findAll();
+
+        return allDocs.stream()
+            .filter(doc ->
+                (doc.getTitle() != null && doc.getTitle().toLowerCase().contains(query.toLowerCase())) ||
+                (doc.getFilename() != null && doc.getFilename().toLowerCase().contains(query.toLowerCase())) ||
+                (doc.getDescription() != null && doc.getDescription().toLowerCase().contains(query.toLowerCase())) ||
+                (doc.getContent() != null && doc.getContent().toLowerCase().contains(query.toLowerCase())) ||
+                (doc.getTags() != null && doc.getTags().stream()
+                    .anyMatch(tag -> tag.toLowerCase().contains(query.toLowerCase())))
+            )
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Calculate relevance score based on where the query matches
+     */
+    private double calculateRelevanceScore(Document doc, String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return 1.0;
+        }
+
+        String lowerQuery = query.toLowerCase();
+        double score = 0.0;
+
+        // Title match (highest weight)
+        if (doc.getTitle() != null && doc.getTitle().toLowerCase().contains(lowerQuery)) {
+            score += 3.0;
+        }
+
+        // Filename match
+        if (doc.getFilename() != null && doc.getFilename().toLowerCase().contains(lowerQuery)) {
+            score += 2.0;
+        }
+
+        // Tags match
+        if (doc.getTags() != null && doc.getTags().stream()
+                .anyMatch(tag -> tag.toLowerCase().contains(lowerQuery))) {
+            score += 2.5;
+        }
+
+        // Description match
+        if (doc.getDescription() != null && doc.getDescription().toLowerCase().contains(lowerQuery)) {
+            score += 1.5;
+        }
+
+        // Content match (lowest weight, but still relevant)
+        if (doc.getContent() != null && doc.getContent().toLowerCase().contains(lowerQuery)) {
+            score += 1.0;
+        }
+
+        return Math.min(score, 5.0); // Cap at 5.0
     }
 
     /**
@@ -327,204 +415,4 @@ public class SearchService {
         if (filters.getTags() != null) map.put("tags", filters.getTags());
         return map;
     }
-}
-
-/**
- * Search request
- */
-class SearchRequest {
-    private String query;
-    private EntityType entityType;
-    private Map<String, Object> filters;
-    private String sortBy;
-    private SortOrder sortOrder;
-    private Integer from;
-    private Integer size;
-    private boolean includeFacets;
-    private boolean includeHighlights;
-
-    // Getters and setters
-    public String getQuery() { return query; }
-    public void setQuery(String query) { this.query = query; }
-    public EntityType getEntityType() { return entityType; }
-    public void setEntityType(EntityType entityType) { this.entityType = entityType; }
-    public Map<String, Object> getFilters() { return filters; }
-    public void setFilters(Map<String, Object> filters) { this.filters = filters; }
-    public String getSortBy() { return sortBy; }
-    public void setSortBy(String sortBy) { this.sortBy = sortBy; }
-    public SortOrder getSortOrder() { return sortOrder; }
-    public void setSortOrder(SortOrder sortOrder) { this.sortOrder = sortOrder; }
-    public Integer getFrom() { return from; }
-    public void setFrom(Integer from) { this.from = from; }
-    public Integer getSize() { return size; }
-    public void setSize(Integer size) { this.size = size; }
-    public boolean isIncludeFacets() { return includeFacets; }
-    public void setIncludeFacets(boolean includeFacets) { this.includeFacets = includeFacets; }
-    public boolean isIncludeHighlights() { return includeHighlights; }
-    public void setIncludeHighlights(boolean includeHighlights) {
-        this.includeHighlights = includeHighlights;
-    }
-}
-
-/**
- * Search response
- */
-class SearchResponse {
-    private String query;
-    private List<SearchResult> results;
-    private int totalHits;
-    private int from;
-    private int size;
-    private Map<String, Map<String, Long>> facets;
-    private Map<String, List<String>> highlights;
-    private boolean success;
-    private String errorMessage;
-    private Date startTime;
-    private Date endTime;
-    private long durationMs;
-
-    // Getters and setters
-    public String getQuery() { return query; }
-    public void setQuery(String query) { this.query = query; }
-    public List<SearchResult> getResults() { return results; }
-    public void setResults(List<SearchResult> results) { this.results = results; }
-    public int getTotalHits() { return totalHits; }
-    public void setTotalHits(int totalHits) { this.totalHits = totalHits; }
-    public int getFrom() { return from; }
-    public void setFrom(int from) { this.from = from; }
-    public int getSize() { return size; }
-    public void setSize(int size) { this.size = size; }
-    public Map<String, Map<String, Long>> getFacets() { return facets; }
-    public void setFacets(Map<String, Map<String, Long>> facets) { this.facets = facets; }
-    public Map<String, List<String>> getHighlights() { return highlights; }
-    public void setHighlights(Map<String, List<String>> highlights) { this.highlights = highlights; }
-    public boolean isSuccess() { return success; }
-    public void setSuccess(boolean success) { this.success = success; }
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    public Date getStartTime() { return startTime; }
-    public void setStartTime(Date startTime) { this.startTime = startTime; }
-    public Date getEndTime() { return endTime; }
-    public void setEndTime(Date endTime) { this.endTime = endTime; }
-    public long getDurationMs() { return durationMs; }
-    public void setDurationMs(long durationMs) { this.durationMs = durationMs; }
-}
-
-/**
- * Search result
- */
-class SearchResult {
-    private String id;
-    private EntityType type;
-    private String title;
-    private String description;
-    private double score;
-    private Date createdDate;
-    private Date modifiedDate;
-    private Map<String, Object> data;
-
-    // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public EntityType getType() { return type; }
-    public void setType(EntityType type) { this.type = type; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    public double getScore() { return score; }
-    public void setScore(double score) { this.score = score; }
-    public Date getCreatedDate() { return createdDate; }
-    public void setCreatedDate(Date createdDate) { this.createdDate = createdDate; }
-    public Date getModifiedDate() { return modifiedDate; }
-    public void setModifiedDate(Date modifiedDate) { this.modifiedDate = modifiedDate; }
-    public Map<String, Object> getData() { return data; }
-    public void setData(Map<String, Object> data) { this.data = data; }
-}
-
-/**
- * Index request
- */
-class IndexRequest {
-    private String id;
-    private EntityType entityType;
-    private Map<String, Object> data;
-
-    // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public EntityType getEntityType() { return entityType; }
-    public void setEntityType(EntityType entityType) { this.entityType = entityType; }
-    public Map<String, Object> getData() { return data; }
-    public void setData(Map<String, Object> data) { this.data = data; }
-}
-
-/**
- * Reindex result
- */
-class ReindexResult {
-    private int totalDocuments;
-    private int indexedDocuments;
-    private int failedDocuments;
-    private boolean success;
-    private String errorMessage;
-    private Date startTime;
-    private Date endTime;
-
-    // Getters and setters
-    public int getTotalDocuments() { return totalDocuments; }
-    public void setTotalDocuments(int totalDocuments) { this.totalDocuments = totalDocuments; }
-    public int getIndexedDocuments() { return indexedDocuments; }
-    public void setIndexedDocuments(int indexedDocuments) { this.indexedDocuments = indexedDocuments; }
-    public int getFailedDocuments() { return failedDocuments; }
-    public void setFailedDocuments(int failedDocuments) { this.failedDocuments = failedDocuments; }
-    public boolean isSuccess() { return success; }
-    public void setSuccess(boolean success) { this.success = success; }
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    public Date getStartTime() { return startTime; }
-    public void setStartTime(Date startTime) { this.startTime = startTime; }
-    public Date getEndTime() { return endTime; }
-    public void setEndTime(Date endTime) { this.endTime = endTime; }
-}
-
-/**
- * Document search filters
- */
-class DocumentSearchFilters {
-    private String author;
-    private Date dateFrom;
-    private Date dateTo;
-    private List<String> tags;
-
-    // Getters and setters
-    public String getAuthor() { return author; }
-    public void setAuthor(String author) { this.author = author; }
-    public Date getDateFrom() { return dateFrom; }
-    public void setDateFrom(Date dateFrom) { this.dateFrom = dateFrom; }
-    public Date getDateTo() { return dateTo; }
-    public void setDateTo(Date dateTo) { this.dateTo = dateTo; }
-    public List<String> getTags() { return tags; }
-    public void setTags(List<String> tags) { this.tags = tags; }
-}
-
-/**
- * Entity types
- */
-enum EntityType {
-    DOCUMENT,
-    BUSINESS_OBJECT,
-    EXTRACTION,
-    MIGRATION,
-    USER,
-    DATA_QUALITY_RULE,
-    RETENTION_POLICY
-}
-
-/**
- * Sort order
- */
-enum SortOrder {
-    ASC,
-    DESC
 }
