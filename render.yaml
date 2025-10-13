@@ -13,6 +13,7 @@ services:
     region: oregon
     plan: free
     dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: production
@@ -37,6 +38,7 @@ services:
     region: oregon
     plan: free
     dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
     envVars:
       - key: VITE_API_URL
         fromService:
