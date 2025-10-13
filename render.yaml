@@ -1,0 +1,59 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: jivs-postgres
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile.postgres
+    envVars:
+      - key: POSTGRES_DB
+        value: jivs
+      - key: POSTGRES_USER
+        value: jivs_user
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
+
+  # Backend API
+  - type: web
+    name: jivs-backend
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jivs-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: jivs-postgres
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        value: jivs_user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: jivs-postgres
+          property: password
+    healthCheckPath: /actuator/health
+
+  # Frontend
+  - type: web
+    name: jivs-frontend
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: jivs-backend
+          property: host
