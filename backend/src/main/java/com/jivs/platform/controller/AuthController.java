@@ -12,7 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping(Constants.API_V1 + "/auth")
-@RequiredArgsConstructor
 @Tag(name = "Authentication", description = "Authentication and authorization endpoints")
 public class AuthController {
 
@@ -40,8 +39,18 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
-    private final TokenBlacklistService tokenBlacklistService;
     private final UserDetailsService userDetailsService;
+
+    @Autowired(required = false)
+    private TokenBlacklistService tokenBlacklistService;
+
+    public AuthController(AuthenticationManager authenticationManager,
+                         JwtTokenProvider tokenProvider,
+                         UserDetailsService userDetailsService) {
+        this.authenticationManager = authenticationManager;
+        this.tokenProvider = tokenProvider;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Value("${jivs.security.jwt.expiration}")
     private long jwtExpirationMs;
@@ -170,9 +179,13 @@ public class AuthController {
             if (bearerToken != null && bearerToken.startsWith(Constants.BEARER_PREFIX)) {
                 String token = bearerToken.substring(Constants.TOKEN_BEGIN_INDEX);
 
-                // Blacklist the token
-                tokenBlacklistService.blacklistToken(token);
-                log.info("Token blacklisted successfully during logout");
+                // Blacklist the token (if TokenBlacklistService is available)
+                if (tokenBlacklistService != null) {
+                    tokenBlacklistService.blacklistToken(token);
+                    log.info("Token blacklisted successfully during logout");
+                } else {
+                    log.warn("TokenBlacklistService not available - token not blacklisted");
+                }
             }
 
             SecurityContextHolder.clearContext();
