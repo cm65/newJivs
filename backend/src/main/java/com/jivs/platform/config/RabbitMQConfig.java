@@ -7,17 +7,17 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * RabbitMQ message queue configuration
- * Only loaded when RabbitMQ is available on the classpath
+ * Only loaded when RabbitMQ ConnectionFactory bean is available
  */
 @Configuration
 @EnableRabbit
-@ConditionalOnClass(ConnectionFactory.class)
+@ConditionalOnBean(ConnectionFactory.class)
 public class RabbitMQConfig {
 
     // Queue names
