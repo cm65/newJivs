@@ -60,7 +60,7 @@ const Extractions: React.FC = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newExtraction, setNewExtraction] = useState<Partial<ExtractionConfig>>({
     name: '',
-    sourceType: 'POSTGRESQL',
+    sourceType: 'JDBC',
     connectionConfig: {},
   });
   const [activeQuickFilter, setActiveQuickFilter] = useState<string | undefined>();
@@ -249,7 +249,7 @@ const Extractions: React.FC = () => {
     try {
       await extractionService.createExtraction(newExtraction as ExtractionConfig);
       setCreateDialogOpen(false);
-      setNewExtraction({ name: '', sourceType: 'POSTGRESQL', connectionConfig: {} });
+      setNewExtraction({ name: '', sourceType: 'JDBC', connectionConfig: {} });
       loadExtractions();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create extraction');
