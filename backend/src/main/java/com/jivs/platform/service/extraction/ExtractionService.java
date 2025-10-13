@@ -34,7 +34,8 @@ public class ExtractionService {
 
     private final ExtractionJobRepository extractionJobRepository;
     private final DataSourceRepository dataSourceRepository;
-    private final RabbitTemplate rabbitTemplate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RabbitTemplate rabbitTemplate;
     private final ConnectorFactory connectorFactory;
     private final ExtractionEventPublisher eventPublisher;
 
@@ -84,6 +85,11 @@ public class ExtractionService {
      * Queue extraction job for async processing
      */
     private void queueExtractionJob(ExtractionJob job) {
+        if (rabbitTemplate == null) {
+            log.warn("RabbitMQ not available, skipping job queueing for: {}", job.getJobId());
+            return;
+        }
+
         Map<String, Object> message = new HashMap<>();
         message.put("jobId", job.getJobId());
 
@@ -285,6 +291,11 @@ public class ExtractionService {
      * Send completion notification
      */
     private void sendCompletionNotification(ExtractionJob job) {
+        if (rabbitTemplate == null) {
+            log.warn("RabbitMQ not available, skipping completion notification for: {}", job.getJobId());
+            return;
+        }
+
         Map<String, Object> notification = new HashMap<>();
         notification.put("jobId", job.getJobId());
         notification.put("status", job.getStatus());

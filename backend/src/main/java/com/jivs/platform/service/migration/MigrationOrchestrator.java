@@ -38,7 +38,8 @@ public class MigrationOrchestrator {
     private final ValidationService validationService;
     private final LoadService loadService;
     private final StorageService storageService;
-    private final RabbitTemplate rabbitTemplate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RabbitTemplate rabbitTemplate;
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     /**
@@ -91,7 +92,12 @@ public class MigrationOrchestrator {
         Migration savedMigration = migrationRepository.save(migration);
 
         // Send to planning queue
-        rabbitTemplate.convertAndSend("migration.planning", savedMigration.getId());
+        if (rabbitTemplate != null) {
+            rabbitTemplate.convertAndSend("migration.planning", savedMigration.getId());
+            log.info("Migration {} queued for planning", savedMigration.getId());
+        } else {
+            log.warn("RabbitMQ not available, migration {} created but not queued", savedMigration.getId());
+        }
 
         return savedMigration;
     }
