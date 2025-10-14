@@ -1,7 +1,7 @@
 package com.jivs.platform.config;
 
-import com.jivs.platform.domain.Role;
-import com.jivs.platform.domain.User;
+import com.jivs.platform.domain.user.Role;
+import com.jivs.platform.domain.user.User;
 import com.jivs.platform.repository.RoleRepository;
 import com.jivs.platform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
