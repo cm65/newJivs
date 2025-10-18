@@ -8,7 +8,7 @@ cmds = ["npm install"]
 cmds = ["npm run build"]
 
 [phases.start]
-cmd = "nginx -g 'daemon off;'"
+cmd = "sh start.sh"
 
 [staticAssets]
 "dist" = "/"
