@@ -29,12 +29,8 @@ RUN mkdir -p /app/logs /var/jivs/storage && \
 # Switch to non-root user
 USER jivs
 
-# Expose port
+# Expose port (Railway will override with $PORT)
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
-
-# Run application
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Djava.security.egd=file:/dev/./urandom", "-Dspring.profiles.active=production", "-jar", "app.jar"]
+# Run application with Railway's PORT variable
+CMD java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dspring.profiles.active=production -Dserver.port=${PORT:-8080} -jar app.jar
