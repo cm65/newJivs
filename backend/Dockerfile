@@ -29,5 +29,14 @@ USER jivs
 # Expose port (Railway will override with $PORT)
 EXPOSE 8080
 
-# Run application with Railway's PORT variable
-CMD java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dspring.profiles.active=production -Dserver.port=${PORT:-8080} -jar app.jar
+# Run application with Railway's PORT variable and memory optimization
+CMD java -XX:+UseContainerSupport \
+    -Xms256m -Xmx512m \
+    -XX:MaxMetaspaceSize=256m \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=100 \
+    -XX:+UseStringDeduplication \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Dspring.profiles.active=production \
+    -Dserver.port=${PORT:-8080} \
+    -jar app.jar
