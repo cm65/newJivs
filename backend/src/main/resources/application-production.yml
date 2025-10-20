@@ -14,16 +14,11 @@ spring:
       - org.camunda.bpm.spring.boot.starter.rest.CamundaBpmRestAutoConfiguration
       - org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
 
-  # Use environment variables for database connection
+  # Use Railway's DATABASE_URL environment variable
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://jivs-postgres.railway.internal:5432/railway}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jivs}
     driver-class-name: org.postgresql.Driver
     hikari:
-      jdbc-url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://jivs-postgres.railway.internal:5432/railway}
-      username: ${SPRING_DATASOURCE_USERNAME:postgres}
-      password: ${SPRING_DATASOURCE_PASSWORD}
       maximum-pool-size: 10    # Reduced for free tier
       minimum-idle: 2
       connection-timeout: 10000
