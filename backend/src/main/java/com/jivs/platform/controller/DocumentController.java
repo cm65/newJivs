@@ -309,6 +309,62 @@ public class DocumentController {
     }
 
     /**
+     * Diagnostic endpoint to check storage directory status
+     */
+    @GetMapping("/storage/diagnostic")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Storage diagnostic", description = "Check storage directory status and permissions")
+    public ResponseEntity<Map<String, Object>> storageDiagnostic() {
+        Map<String, Object> diagnostic = new HashMap<>();
+
+        try {
+            java.nio.file.Path storagePath = java.nio.file.Paths.get("/var/jivs/storage");
+            diagnostic.put("storagePath", storagePath.toString());
+            diagnostic.put("absolutePath", storagePath.toAbsolutePath().toString());
+            diagnostic.put("exists", java.nio.file.Files.exists(storagePath));
+            diagnostic.put("isDirectory", java.nio.file.Files.isDirectory(storagePath));
+            diagnostic.put("isReadable", java.nio.file.Files.isReadable(storagePath));
+            diagnostic.put("isWritable", java.nio.file.Files.isWritable(storagePath));
+
+            // Try to create test directory
+            try {
+                java.nio.file.Path testDir = storagePath.resolve("diagnostic-test");
+                java.nio.file.Files.createDirectories(testDir);
+                diagnostic.put("canCreateDirectory", true);
+
+                // Try to write test file
+                java.nio.file.Path testFile = testDir.resolve("test.txt");
+                java.nio.file.Files.write(testFile, "test".getBytes());
+                diagnostic.put("canWriteFile", true);
+                diagnostic.put("testFilePath", testFile.toString());
+
+                // Clean up
+                java.nio.file.Files.delete(testFile);
+                java.nio.file.Files.delete(testDir);
+                diagnostic.put("cleanupSuccess", true);
+            } catch (Exception e) {
+                diagnostic.put("canCreateDirectory", false);
+                diagnostic.put("writeError", e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
+
+            // Check parent directory
+            java.nio.file.Path parentPath = java.nio.file.Paths.get("/var/jivs");
+            diagnostic.put("parentExists", java.nio.file.Files.exists(parentPath));
+            diagnostic.put("parentIsDirectory", java.nio.file.Files.isDirectory(parentPath));
+
+            // Check /var directory
+            java.nio.file.Path varPath = java.nio.file.Paths.get("/var");
+            diagnostic.put("varExists", java.nio.file.Files.exists(varPath));
+            diagnostic.put("varIsWritable", java.nio.file.Files.isWritable(varPath));
+
+        } catch (Exception e) {
+            diagnostic.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+
+        return ResponseEntity.ok(diagnostic);
+    }
+
+    /**
      * Get document statistics
      */
     @GetMapping("/statistics")
