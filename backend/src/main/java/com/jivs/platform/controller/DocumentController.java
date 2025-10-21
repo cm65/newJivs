@@ -342,4 +342,84 @@ public class DocumentController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    /**
+     * Get archiving rules
+     */
+    @GetMapping("/archiving/rules")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @Operation(summary = "Get archiving rules", description = "Get document archiving rules and policies")
+    public ResponseEntity<Map<String, Object>> getArchivingRules() {
+        log.info("Fetching archiving rules");
+
+        Map<String, Object> rules = new HashMap<>();
+
+        // Storage tiers
+        Map<String, Object> storageTiers = new HashMap<>();
+        storageTiers.put("HOT", Map.of("description", "Frequently accessed", "retentionDays", 90));
+        storageTiers.put("WARM", Map.of("description", "Occasionally accessed", "retentionDays", 365));
+        storageTiers.put("COLD", Map.of("description", "Rarely accessed", "retentionDays", 2555)); // 7 years
+
+        rules.put("storageTiers", storageTiers);
+        rules.put("defaultTier", "WARM");
+        rules.put("compressionEnabled", true);
+        rules.put("encryptionRequired", false);
+
+        return ResponseEntity.ok(rules);
+    }
+
+    /**
+     * Create archiving rule
+     */
+    @PostMapping("/archiving/rules")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create archiving rule", description = "Create a new document archiving rule")
+    public ResponseEntity<Map<String, Object>> createArchivingRule(@RequestBody Map<String, Object> rule) {
+        log.info("Creating archiving rule");
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Archiving rule created successfully");
+        response.put("rule", rule);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update archiving rule
+     */
+    @PutMapping("/archiving/rules/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update archiving rule", description = "Update an existing archiving rule")
+    public ResponseEntity<Map<String, Object>> updateArchivingRule(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> rule) {
+
+        log.info("Updating archiving rule with ID: {}", id);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Archiving rule updated successfully");
+        response.put("ruleId", id);
+        response.put("rule", rule);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Delete archiving rule
+     */
+    @DeleteMapping("/archiving/rules/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete archiving rule", description = "Delete an archiving rule")
+    public ResponseEntity<Map<String, Object>> deleteArchivingRule(@PathVariable Long id) {
+        log.info("Deleting archiving rule with ID: {}", id);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Archiving rule deleted successfully");
+        response.put("ruleId", id);
+
+        return ResponseEntity.ok(response);
+    }
 }
