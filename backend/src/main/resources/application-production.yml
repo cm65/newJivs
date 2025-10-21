@@ -15,8 +15,9 @@ spring:
       - org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration
 
   # Use Railway's DATABASE_URL environment variable
+  # Railway provides DATABASE_URL as postgresql://, but JDBC needs jdbc:postgresql://
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/jivs}
+    url: jdbc:${DATABASE_URL:postgresql://localhost:5432/jivs}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10    # Reduced for free tier
