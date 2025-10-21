@@ -6,11 +6,11 @@ WORKDIR /app
 
 # Copy pom.xml and download dependencies first (cacheable layer)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:resolve -B
 
 # Copy source and build
 COPY src ./src
-RUN mvn package -Dmaven.test.skip=true -B -DskipTests -o
+RUN mvn package -Dmaven.test.skip=true -B -DskipTests
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
