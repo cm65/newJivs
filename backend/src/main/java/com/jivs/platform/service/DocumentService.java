@@ -12,6 +12,7 @@ import com.jivs.platform.service.storage.FileData;
 import com.jivs.platform.service.search.SearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -48,6 +49,9 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final StorageService storageService;
     private final SearchService searchService;
+
+    @Value("${encryption.enabled:false}")
+    private boolean encryptionEnabled;
 
     /**
      * Upload a document
@@ -87,8 +91,8 @@ public class DocumentService {
         // Store file using the generated ID
         StorageOptions storageOpts = new StorageOptions();
         storageOpts.setDirectory("documents");
-        storageOpts.setEncrypted(true);  // Enable AES-256-GCM encryption
-        storageOpts.setCompress(true);   // Enable GZIP compression
+        storageOpts.setEncrypted(encryptionEnabled);  // Only encrypt if keys are configured
+        storageOpts.setCompress(encryptionEnabled);    // Only compress if encryption is enabled
         StorageResult storageResult = storageService.storeFile(String.valueOf(document.getId()), file.getBytes(), storageOpts);
         String storagePath = storageResult.getPath();
         document.setStoragePath(storagePath);

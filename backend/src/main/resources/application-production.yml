@@ -85,6 +85,7 @@ storage:
 
 # Encryption configuration
 encryption:
+  enabled: ${ENCRYPTION_ENABLED:false}  # Set to true only when keys are configured
   master-key: ${ENCRYPTION_MASTER_KEY:}
   key-rotation-enabled: true
 
