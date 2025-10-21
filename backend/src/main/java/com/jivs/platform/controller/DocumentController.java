@@ -87,6 +87,12 @@ public class DocumentController {
             return ResponseEntity.ok(document);
 
         } catch (IOException e) {
+            log.error("Failed to upload document: {}", file.getOriginalFilename(), e);
+            log.error("Error details: {}", e.getMessage());
+            log.error("Storage path configured: /var/jivs/storage");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (Exception e) {
+            log.error("Unexpected error uploading document: {}", file.getOriginalFilename(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
