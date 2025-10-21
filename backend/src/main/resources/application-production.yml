@@ -78,6 +78,11 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
 # JiVS configuration for production
+# Storage configuration for Railway volume
+storage:
+  base-path: /var/jivs/storage
+  temp-path: /tmp/jivs-temp
+
 jivs:
   security:
     cors:
