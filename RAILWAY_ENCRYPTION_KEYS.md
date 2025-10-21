@@ -21,29 +21,37 @@ xboRPNDKbjyNqyjvZLP8vECOOyNpa7nGn6e3eSOPGsw=
 
 ---
 
-## 🚀 Set in Railway (Required Before Deployment)
+## 🚀 Set in Railway (When Ready to Enable Encryption)
 
-Run these commands in Railway CLI or use the Railway dashboard:
+⚠️ **IMPORTANT**: Encryption is DISABLED by default (safe).
+To enable, you need to set **3 variables**:
 
 ### Option 1: Railway CLI
 ```bash
-railway variables set ENCRYPTION_MASTER_KEY="euiTn1A/BqbmSEjntK7WY/MtXKTXynI2fVHEbmw68YA="
-railway variables set ENCRYPTION_KEY="xboRPNDKbjyNqyjvZLP8vECOOyNpa7nGn6e3eSOPGsw="
+railway login
+railway variables --set "ENCRYPTION_ENABLED=true" \
+                  --set "ENCRYPTION_MASTER_KEY=euiTn1A/BqbmSEjntK7WY/MtXKTXynI2fVHEbmw68YA=" \
+                  --set "ENCRYPTION_KEY=xboRPNDKbjyNqyjvZLP8vECOOyNpa7nGn6e3eSOPGsw="
 ```
 
-### Option 2: Railway Dashboard
+### Option 2: Railway Dashboard (Recommended)
 1. Go to: https://railway.app/dashboard
 2. Select `jivs-backend-production` service
 3. Go to **Variables** tab
-4. Click **+ New Variable**
-5. Add:
+
+4. Click **+ New Variable** and add:
+   - Name: `ENCRYPTION_ENABLED`
+   - Value: `true`
+
+5. Click **+ New Variable** again and add:
    - Name: `ENCRYPTION_MASTER_KEY`
    - Value: `euiTn1A/BqbmSEjntK7WY/MtXKTXynI2fVHEbmw68YA=`
-6. Click **+ New Variable** again
-7. Add:
+
+6. Click **+ New Variable** again and add:
    - Name: `ENCRYPTION_KEY`
    - Value: `xboRPNDKbjyNqyjvZLP8vECOOyNpa7nGn6e3eSOPGsw=`
-8. Click **Deploy** to apply changes
+
+7. Click **Deploy** to apply changes
 
 ---
 
