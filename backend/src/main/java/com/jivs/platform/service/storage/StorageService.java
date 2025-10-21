@@ -56,6 +56,16 @@ public class StorageService {
             // Get file data
             byte[] fileData = file.getBytes();
 
+            // Compress if required
+            if (options.isCompress()) {
+                byte[] originalData = fileData;
+                fileData = compressData(fileData);
+                result.setCompressed(true);
+                double compressionRatio = (double) fileData.length / originalData.length;
+                log.info("Compressed {} bytes to {} bytes (ratio: {:.2f})",
+                    originalData.length, fileData.length, compressionRatio);
+            }
+
             // Encrypt if required
             if (options.isEncrypted()) {
                 fileData = encryptionService.encrypt(fileData);
@@ -101,6 +111,16 @@ public class StorageService {
 
             byte[] fileData = data;
 
+            // Compress if required
+            if (options.isCompress()) {
+                byte[] originalData = fileData;
+                fileData = compressData(fileData);
+                result.setCompressed(true);
+                double compressionRatio = (double) fileData.length / originalData.length;
+                log.info("Compressed {} bytes to {} bytes (ratio: {:.2f})",
+                    originalData.length, fileData.length, compressionRatio);
+            }
+
             if (options.isEncrypted()) {
                 fileData = encryptionService.encrypt(fileData);
                 result.setEncrypted(true);
@@ -143,6 +163,11 @@ public class StorageService {
             // Decrypt if needed
             if (metadata.isEncrypted()) {
                 data = encryptionService.decrypt(data);
+            }
+
+            // Decompress if needed
+            if (metadata.isCompressed()) {
+                data = decompressData(data);
             }
 
             // Verify checksum
@@ -645,6 +670,41 @@ public class StorageService {
         } catch (Exception e) {
             log.error("Error generating checksum: {}", e.getMessage());
             return "";
+        }
+    }
+
+    /**
+     * Compress data using GZIP
+     */
+    private byte[] compressData(byte[] data) throws IOException {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             java.util.zip.GZIPOutputStream gzipOut = new java.util.zip.GZIPOutputStream(baos)) {
+            gzipOut.write(data);
+            gzipOut.finish();
+            return baos.toByteArray();
+        } catch (IOException e) {
+            log.error("Compression failed: {}", e.getMessage(), e);
+            throw new IOException("Failed to compress data", e);
+        }
+    }
+
+    /**
+     * Decompress GZIP data
+     */
+    private byte[] decompressData(byte[] compressedData) throws IOException {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(compressedData);
+             java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(bais);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = gzipIn.read(buffer)) > 0) {
+                baos.write(buffer, 0, len);
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            log.error("Decompression failed: {}", e.getMessage(), e);
+            throw new IOException("Failed to decompress data", e);
         }
     }
 }

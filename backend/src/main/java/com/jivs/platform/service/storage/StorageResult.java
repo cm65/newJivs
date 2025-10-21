@@ -19,6 +19,7 @@ public class StorageResult {
     private String contentType;
     private String checksum;
     private boolean encrypted;
+    private boolean compressed;
     private StorageLocation location;
     private Date uploadTimestamp;
 
@@ -60,6 +61,9 @@ public class StorageResult {
 
     public boolean isEncrypted() { return encrypted; }
     public void setEncrypted(boolean encrypted) { this.encrypted = encrypted; }
+
+    public boolean isCompressed() { return compressed; }
+    public void setCompressed(boolean compressed) { this.compressed = compressed; }
 
     public StorageLocation getLocation() { return location; }
     public void setLocation(StorageLocation location) { this.location = location; }

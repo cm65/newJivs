@@ -83,7 +83,15 @@ storage:
   base-path: /var/jivs/storage
   temp-path: /tmp/jivs-temp
 
+# Encryption configuration
+encryption:
+  master-key: ${ENCRYPTION_MASTER_KEY:}
+  key-rotation-enabled: true
+
 jivs:
+  encryption:
+    key: ${ENCRYPTION_KEY:}
+
   security:
     cors:
       allowed-origins: https://jivs-frontend-production.up.railway.app,https://jivs-backend-production.up.railway.app

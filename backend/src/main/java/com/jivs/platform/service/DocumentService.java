@@ -87,6 +87,8 @@ public class DocumentService {
         // Store file using the generated ID
         StorageOptions storageOpts = new StorageOptions();
         storageOpts.setDirectory("documents");
+        storageOpts.setEncrypted(true);  // Enable AES-256-GCM encryption
+        storageOpts.setCompress(true);   // Enable GZIP compression
         StorageResult storageResult = storageService.storeFile(String.valueOf(document.getId()), file.getBytes(), storageOpts);
         String storagePath = storageResult.getPath();
         document.setStoragePath(storagePath);
