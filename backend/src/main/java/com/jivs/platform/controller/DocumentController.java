@@ -49,7 +49,7 @@ public class DocumentController {
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     @Operation(summary = "Upload a document", description = "Upload and optionally archive a document")
-    public ResponseEntity<DocumentDTO> uploadDocument(
+    public ResponseEntity<?> uploadDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "description", required = false) String description,
@@ -89,11 +89,29 @@ public class DocumentController {
         } catch (IOException e) {
             log.error("Failed to upload document: {}", file.getOriginalFilename(), e);
             log.error("Error details: {}", e.getMessage());
+            log.error("Stack trace:", e);
             log.error("Storage path configured: /var/jivs/storage");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+
+            // Return proper error response for frontend
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Failed to upload document: " + e.getMessage());
+            errorResponse.put("message", "Document upload failed due to storage error");
+            errorResponse.put("filename", file.getOriginalFilename());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         } catch (Exception e) {
             log.error("Unexpected error uploading document: {}", file.getOriginalFilename(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("Stack trace:", e);
+
+            // Return proper error response for frontend
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Unexpected error: " + e.getMessage());
+            errorResponse.put("message", "Document upload failed");
+            errorResponse.put("filename", file.getOriginalFilename());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
