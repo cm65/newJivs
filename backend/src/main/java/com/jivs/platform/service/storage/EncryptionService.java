@@ -2,6 +2,7 @@ package com.jivs.platform.service.storage;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -41,6 +42,7 @@ public class EncryptionService {
     /**
      * Initialize encryption service
      */
+    @PostConstruct
     public void initialize() throws Exception {
         if (masterKeyBase64 != null && !masterKeyBase64.isEmpty()) {
             byte[] keyBytes = Base64.getDecoder().decode(masterKeyBase64);
