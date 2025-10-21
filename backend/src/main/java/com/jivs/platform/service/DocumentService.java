@@ -183,17 +183,29 @@ public class DocumentService {
     }
 
     /**
-     * Download document
+     * Download document (decompress if compressed)
      */
     public byte[] downloadDocument(Long id) throws IOException {
         Optional<Document> document = documentRepository.findById(id);
         if (document.isPresent()) {
-            // Read file directly from storage path since metadata lookup is not implemented
-            String storagePath = document.get().getStoragePath();
+            Document doc = document.get();
+            String storagePath = doc.getStoragePath();
+
             if (storagePath != null && !storagePath.isEmpty()) {
                 Path filePath = Paths.get(storagePath);
                 if (Files.exists(filePath)) {
-                    return Files.readAllBytes(filePath);
+                    // Read file data
+                    byte[] fileData = Files.readAllBytes(filePath);
+
+                    // Decompress if file is compressed
+                    if (doc.isCompressed()) {
+                        log.debug("Decompressing document {} before download", id);
+                        fileData = decompressData(fileData);
+                        log.debug("Document {} decompressed: {} bytes", id, fileData.length);
+                    }
+
+                    return fileData;
+
                 } else {
                     log.error("File not found at path: {}", storagePath);
                     throw new FileNotFoundException("File not found at path: " + storagePath);
@@ -201,6 +213,24 @@ public class DocumentService {
             }
         }
         return null;
+    }
+
+    /**
+     * Decompress GZIP data
+     */
+    private byte[] decompressData(byte[] compressedData) throws IOException {
+        java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(compressedData);
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+
+        try (java.util.zip.GZIPInputStream gzipIn = new java.util.zip.GZIPInputStream(bais)) {
+            byte[] buffer = new byte[4096];
+            int len;
+            while ((len = gzipIn.read(buffer)) > 0) {
+                baos.write(buffer, 0, len);
+            }
+        }
+
+        return baos.toByteArray();
     }
 
     /**

@@ -5,6 +5,7 @@ import com.jivs.platform.dto.DocumentSearchRequest;
 import com.jivs.platform.dto.DocumentSearchResponse;
 import com.jivs.platform.service.DocumentService;
 import com.jivs.platform.service.archiving.DocumentArchivingService;
+import com.jivs.platform.service.archiving.DocumentCompressionHelper;
 import com.jivs.platform.service.search.SearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ public class DocumentController {
 
     private final DocumentService documentService;
     private final DocumentArchivingService archivingService;
+    private final DocumentCompressionHelper compressionHelper;
     private final SearchService searchService;
 
     /**
@@ -77,12 +80,30 @@ public class DocumentController {
                 tagList
             );
 
-            // Archive if requested
+            // Archive if requested (compress file immediately)
             if (archive) {
-                document.setArchived(true);
-                document.setStorageTier("WARM"); // Default storage tier for archived documents
-                document = documentService.updateDocument(document.getId(), document);
-                log.info("Document {} archived immediately after upload", document.getId());
+                try {
+                    // Compress the just-uploaded file
+                    Map<String, Object> compressionResult = compressionHelper.compressDocumentFile(
+                        document.getId(),
+                        storageTier != null && !storageTier.equals("HOT") ? storageTier : "WARM"
+                    );
+
+                    // Reload document to get updated metadata
+                    document = documentService.getDocument(document.getId());
+
+                    log.info("Document {} uploaded and archived successfully: compressed={}",
+                        document.getId(), compressionResult.get("compressed"));
+
+                } catch (IOException e) {
+                    // Compression failed, but upload succeeded
+                    log.error("Document {} uploaded but archiving failed: {}",
+                        document.getId(), e.getMessage());
+
+                    // Don't mark as archived if compression failed
+                    document.setArchived(false);
+                    document = documentService.updateDocument(document.getId(), document);
+                }
             }
 
             return ResponseEntity.ok(document);
@@ -178,72 +199,11 @@ public class DocumentController {
     }
 
     /**
-     * Bulk archive documents
-     */
-    @PostMapping("/archive")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @Operation(summary = "Archive multiple documents", description = "Archive multiple documents at once")
-    public ResponseEntity<Map<String, Object>> archiveDocuments(@RequestBody Map<String, Object> request) {
-        try {
-            @SuppressWarnings("unchecked")
-            List<Object> documentIds = (List<Object>) request.get("documentIds");
-            String archiveType = (String) request.getOrDefault("archiveType", "WARM");
-            Boolean compress = (Boolean) request.getOrDefault("compress", true);
-            String archiveReason = (String) request.getOrDefault("archiveReason", "");
-
-            int successCount = 0;
-            int failureCount = 0;
-
-            for (Object docIdObj : documentIds) {
-                try {
-                    // Handle both Integer and String IDs
-                    Long docId;
-                    if (docIdObj instanceof Integer) {
-                        docId = ((Integer) docIdObj).longValue();
-                    } else if (docIdObj instanceof String) {
-                        docId = Long.valueOf((String) docIdObj);
-                    } else {
-                        docId = ((Number) docIdObj).longValue();
-                    }
-
-                    // Update document to archived status
-                    DocumentDTO doc = documentService.getDocument(docId);
-                    if (doc != null) {
-                        doc.setArchived(true);
-                        doc.setStorageTier(archiveType);
-                        documentService.updateDocument(docId, doc);
-                        successCount++;
-                    } else {
-                        failureCount++;
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to archive document {}: {}", docIdObj, e.getMessage());
-                    failureCount++;
-                }
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", failureCount == 0);
-            response.put("successCount", successCount);
-            response.put("failureCount", failureCount);
-            response.put("message", String.format("Archived %d document(s), %d failed", successCount, failureCount));
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-
-    /**
-     * Archive a single document
+     * Archive a single document (compress file)
      */
     @PostMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @Operation(summary = "Archive document", description = "Archive an existing document")
+    @Operation(summary = "Archive document", description = "Archive and compress an existing document")
     public ResponseEntity<Map<String, Object>> archiveDocument(
             @PathVariable Long id,
             @RequestParam(value = "compress", defaultValue = "true") boolean compress,
@@ -252,23 +212,152 @@ public class DocumentController {
 
         try {
             DocumentDTO doc = documentService.getDocument(id);
-            if (doc != null) {
+            if (doc == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Compress file if requested (default: true)
+            if (compress) {
+                Map<String, Object> compressionResult = compressionHelper.compressDocumentFile(id, storageTier);
+
+                // Add compression details to response
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Document archived successfully");
+                response.put("documentId", id);
+                response.put("compressed", compressionResult.get("compressed"));
+                response.put("compressionRatio", compressionResult.get("compressionRatio"));
+                response.put("spaceSaved", compressionResult.get("spaceSaved"));
+
+                return ResponseEntity.ok(response);
+
+            } else {
+                // Archive without compression (just set flags)
                 doc.setArchived(true);
                 doc.setStorageTier(storageTier);
                 documentService.updateDocument(id, doc);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("message", "Document archived successfully");
+                response.put("message", "Document archived (not compressed)");
                 response.put("documentId", id);
+                response.put("compressed", false);
+
                 return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.notFound().build();
             }
+
         } catch (Exception e) {
+            log.error("Failed to archive document {}: {}", id, e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("error", e.getMessage());
+            errorResponse.put("documentId", id);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Archive multiple documents (bulk operation)
+     */
+    @PostMapping("/archive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @Operation(summary = "Archive multiple documents", description = "Archive and compress multiple documents")
+    public ResponseEntity<Map<String, Object>> archiveDocuments(@RequestBody Map<String, Object> request) {
+        try {
+            // Extract parameters from request
+            List<Integer> documentIdsInt = (List<Integer>) request.get("documentIds");
+            if (documentIdsInt == null || documentIdsInt.isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("error", "documentIds is required and cannot be empty");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // Convert to Long
+            List<Long> documentIds = documentIdsInt.stream()
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+
+            boolean compress = (boolean) request.getOrDefault("compress", true);
+            String archiveType = (String) request.getOrDefault("archiveType", "WARM");
+            String storageTier = archiveType != null ? archiveType : "WARM";
+
+            log.info("Starting bulk archive of {} documents with compression={}, storageTier={}",
+                documentIds.size(), compress, storageTier);
+
+            // Process each document
+            List<Map<String, Object>> results = new ArrayList<>();
+            int successCount = 0;
+            int failureCount = 0;
+            long totalSpaceSaved = 0;
+
+            for (Long id : documentIds) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("documentId", id);
+
+                try {
+                    if (compress) {
+                        // Compress document
+                        Map<String, Object> compressionResult = compressionHelper.compressDocumentFile(id, storageTier);
+
+                        result.put("success", true);
+                        result.put("compressed", compressionResult.get("compressed"));
+                        result.put("compressionRatio", compressionResult.get("compressionRatio"));
+                        result.put("spaceSaved", compressionResult.get("spaceSaved"));
+
+                        // Track total space saved
+                        if (compressionResult.get("spaceSaved") != null) {
+                            totalSpaceSaved += (long) compressionResult.get("spaceSaved");
+                        }
+
+                    } else {
+                        // Archive without compression
+                        DocumentDTO doc = documentService.getDocument(id);
+                        if (doc != null) {
+                            doc.setArchived(true);
+                            doc.setStorageTier(storageTier);
+                            documentService.updateDocument(id, doc);
+
+                            result.put("success", true);
+                            result.put("compressed", false);
+                        } else {
+                            result.put("success", false);
+                            result.put("error", "Document not found");
+                            failureCount++;
+                        }
+                    }
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    log.error("Failed to archive document {}: {}", id, e.getMessage());
+                    result.put("success", false);
+                    result.put("error", e.getMessage());
+                    failureCount++;
+                }
+
+                results.add(result);
+            }
+
+            // Build summary response
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", failureCount == 0);
+            response.put("totalDocuments", documentIds.size());
+            response.put("successCount", successCount);
+            response.put("failureCount", failureCount);
+            response.put("totalSpaceSaved", totalSpaceSaved);
+            response.put("results", results);
+
+            log.info("Bulk archive completed: {}/{} succeeded, {} bytes saved",
+                successCount, documentIds.size(), totalSpaceSaved);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Bulk archive failed: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Bulk archive failed: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
