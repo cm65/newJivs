@@ -79,9 +79,10 @@ public class DocumentController {
 
             // Archive if requested
             if (archive) {
-                // Note: Archiving functionality temporarily disabled due to type incompatibility
-                // TODO: Resolve ArchiveRequest type mismatch between DTO and service inner class
                 document.setArchived(true);
+                document.setStorageTier("WARM"); // Default storage tier for archived documents
+                document = documentService.updateDocument(document.getId(), document);
+                log.info("Document {} archived immediately after upload", document.getId());
             }
 
             return ResponseEntity.ok(document);
