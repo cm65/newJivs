@@ -40,7 +40,7 @@ public class DocumentCompressionHelper {
      * @throws IOException if compression fails
      */
     public Map<String, Object> compressDocumentFile(Long documentId, String storageTier) throws IOException {
-        log.info("Starting compression for document {}", documentId);
+        log.info("🚀 Starting compression for document {} with storage tier: {}", documentId, storageTier);
 
         // 1. Get document entity from database (need storagePath which is not in DTO)
         Optional<Document> docOpt = documentRepository.findById(documentId);
@@ -52,12 +52,13 @@ public class DocumentCompressionHelper {
 
         // 2. Check if already compressed (prevent double compression)
         if (doc.isCompressed()) {
-            log.info("Document {} already compressed. Skipping.", documentId);
+            log.info("⏭️  Document {} already compressed (ratio: {}). Skipping to avoid double compression.",
+                documentId, doc.getCompressionRatio());
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("alreadyCompressed", true);
             result.put("compressionRatio", doc.getCompressionRatio());
-            result.put("message", "Document already compressed");
+            result.put("message", "Document already compressed - skipping");
             return result;
         }
 
@@ -114,6 +115,11 @@ public class DocumentCompressionHelper {
             tempPath = originalPath.resolveSibling(originalPath.getFileName() + ".tmp");
             backupPath = originalPath.resolveSibling(originalPath.getFileName() + ".backup");
 
+            // Check file size on disk BEFORE compression
+            long fileSizeOnDiskBefore = Files.size(originalPath);
+            log.info("📊 BEFORE Compression - Document {}: File size on disk: {} bytes at path: {}",
+                documentId, fileSizeOnDiskBefore, originalPath);
+
             // Read original file
             byte[] fileData = Files.readAllBytes(originalPath);
             long originalSize = fileData.length;
@@ -125,8 +131,8 @@ public class DocumentCompressionHelper {
             // Calculate compression ratio
             double compressionRatio = (double) compressedSize / originalSize;
 
-            log.info("Document {} compression: {} bytes → {} bytes (ratio: {:.2f})",
-                documentId, originalSize, compressedSize, compressionRatio);
+            log.info("🗜️  Compression calculation - Document {}: {} bytes → {} bytes (ratio: {:.2f}, reduction: {:.1f}%)",
+                documentId, originalSize, compressedSize, compressionRatio, (1.0 - compressionRatio) * 100);
 
             // Check if compression actually helped (skip if ratio >= 0.95)
             if (compressionRatio >= 0.95) {
@@ -164,19 +170,33 @@ public class DocumentCompressionHelper {
             // ATOMIC REPLACE: Move temp file to original location
             Files.move(tempPath, originalPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
+            // Check file size on disk AFTER compression (verify atomic move worked)
+            long fileSizeOnDiskAfter = Files.size(originalPath);
+            log.info("📊 AFTER Compression - Document {}: File size on disk: {} bytes (was {} bytes)",
+                documentId, fileSizeOnDiskAfter, fileSizeOnDiskBefore);
+            log.info("💾 Actual space saved on disk: {} bytes ({:.1f}% reduction)",
+                fileSizeOnDiskBefore - fileSizeOnDiskAfter,
+                ((double)(fileSizeOnDiskBefore - fileSizeOnDiskAfter) / fileSizeOnDiskBefore) * 100);
+
             // Update database (only after file successfully replaced)
             doc.setCompressed(true);
             doc.setCompressionRatio(compressionRatio);
             doc.setArchived(true);
             doc.setStorageTier(storageTier);
-            documentRepository.save(doc);
+            Document savedDoc = documentRepository.save(doc);
+
+            // Verify database update
+            log.info("💿 Database updated - Document {}: compressed={}, ratio={}, archived={}, tier={}",
+                documentId, savedDoc.isCompressed(), savedDoc.getCompressionRatio(),
+                savedDoc.isArchived(), savedDoc.getStorageTier());
 
             // Delete backup (cleanup)
             Files.deleteIfExists(backupPath);
 
-            log.info("Successfully compressed and archived document {}", documentId);
+            log.info("✅ Successfully compressed and archived document {} - Final size on disk: {} bytes (saved {} bytes)",
+                documentId, fileSizeOnDiskAfter, fileSizeOnDiskBefore - fileSizeOnDiskAfter);
 
-            // Return success result
+            // Return success result with detailed size information
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("compressed", true);
@@ -185,7 +205,10 @@ public class DocumentCompressionHelper {
             result.put("originalSize", originalSize);
             result.put("compressedSize", compressedSize);
             result.put("spaceSaved", originalSize - compressedSize);
-            result.put("message", "Document compressed successfully");
+            result.put("fileSizeOnDiskBefore", fileSizeOnDiskBefore);
+            result.put("fileSizeOnDiskAfter", fileSizeOnDiskAfter);
+            result.put("actualDiskSpaceSaved", fileSizeOnDiskBefore - fileSizeOnDiskAfter);
+            result.put("message", "Document compressed successfully - File size reduced from " + fileSizeOnDiskBefore + " to " + fileSizeOnDiskAfter + " bytes");
             return result;
 
         } catch (Exception e) {
