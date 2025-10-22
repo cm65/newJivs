@@ -33,6 +33,7 @@ public class DocumentDTO {
     private Integer wordCount;
     private String language;
     private String storageTier;
+    private String storagePath;  // Path where file is stored on disk
     private boolean encrypted;
     private boolean compressed;
     private Double compressionRatio;

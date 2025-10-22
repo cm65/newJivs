@@ -578,6 +578,11 @@ public class DocumentService {
         dto.setCreatedDate(document.getCreatedDate());
         dto.setModifiedDate(document.getModifiedDate());
         dto.setChecksum(document.getChecksum());
+        // Add missing fields that were not being mapped
+        dto.setStoragePath(document.getStoragePath());
+        dto.setCompressed(document.isCompressed());
+        dto.setCompressionRatio(document.getCompressionRatio());
+        dto.setEncrypted(document.isEncrypted());
         return dto;
     }
 }
