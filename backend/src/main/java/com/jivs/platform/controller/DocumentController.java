@@ -220,16 +220,14 @@ public class DocumentController {
             if (compress) {
                 Map<String, Object> compressionResult = compressionHelper.compressDocumentFile(id, storageTier);
 
-                // Add compression details to response
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "Document archived successfully");
-                response.put("documentId", id);
-                response.put("compressed", compressionResult.get("compressed"));
-                response.put("compressionRatio", compressionResult.get("compressionRatio"));
-                response.put("spaceSaved", compressionResult.get("spaceSaved"));
+                // Return the full compression result (includes all size details)
+                compressionResult.put("success", true);
+                compressionResult.put("documentId", id);
+                // compressionResult already contains: compressed, compressionRatio, spaceSaved,
+                // originalSize, compressedSize, fileSizeOnDiskBefore, fileSizeOnDiskAfter,
+                // actualDiskSpaceSaved, message
 
-                return ResponseEntity.ok(response);
+                return ResponseEntity.ok(compressionResult);
 
             } else {
                 // Archive without compression (just set flags)
