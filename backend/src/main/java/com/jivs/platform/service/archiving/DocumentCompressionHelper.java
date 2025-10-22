@@ -7,6 +7,7 @@ import com.jivs.platform.service.DocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -39,6 +40,7 @@ public class DocumentCompressionHelper {
      * @return Map with compression results (success, compressionRatio, originalSize, compressedSize)
      * @throws IOException if compression fails
      */
+    @Transactional
     public Map<String, Object> compressDocumentFile(Long documentId, String storageTier) throws IOException {
         log.info("🚀 Starting compression for document {} with storage tier: {}", documentId, storageTier);
 
