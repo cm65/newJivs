@@ -45,8 +45,21 @@ ALTER COLUMN size SET NOT NULL;
 
 -- Add unique constraint on checksum for duplicate prevention
 -- Only for non-null checksums (allows multiple NULL values)
+
+-- First, handle duplicate checksums by setting them to NULL for newer documents
+-- Keep only the oldest document with each checksum
+UPDATE documents SET checksum = NULL
+WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM documents
+    WHERE checksum IS NOT NULL
+    GROUP BY checksum
+);
+
 -- Drop existing index first if it exists from previous failed migration
 DROP INDEX IF EXISTS unique_checksum;
+
+-- Now create the unique index (will succeed since duplicates are cleared)
 CREATE UNIQUE INDEX unique_checksum ON documents(checksum) WHERE checksum IS NOT NULL;
 
 -- Add check constraint for file size (min 1 byte, max 500MB)
