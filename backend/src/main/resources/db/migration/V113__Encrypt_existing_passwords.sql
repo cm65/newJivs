@@ -1,4 +1,4 @@
--- Migration V111: Prepare for password encryption in data_sources table
+-- Migration V113: Prepare for password encryption in data_sources table
 -- ============================================================================
 -- Purpose: Add infrastructure for migrating plaintext passwords to encrypted
 --          passwords. This is a critical security fix.

@@ -1,4 +1,4 @@
--- Migration V111: Workflow Orchestration Improvements
+-- Migration V112: Workflow Orchestration Improvements
 -- Date: 2025-10-26
 -- Description: Add checkpoint support, improve migration tracking, add distributed lock metadata
 
@@ -315,7 +315,7 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO jivs_user;
 -- Log completion
 DO $$
 BEGIN
-    RAISE NOTICE 'Migration V111 completed successfully';
+    RAISE NOTICE 'Migration V112 completed successfully';
     RAISE NOTICE 'Added: checkpoint tracking, distributed lock tracking, retry tracking, event failure tracking';
     RAISE NOTICE 'Added: idempotency keys, performance metrics, circuit breaker events';
     RAISE NOTICE 'Added: materialized view for statistics';
