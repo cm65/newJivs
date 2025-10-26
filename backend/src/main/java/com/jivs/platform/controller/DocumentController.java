@@ -194,15 +194,35 @@ public class DocumentController {
     @Operation(summary = "Download document", description = "Download the original document file")
     public ResponseEntity<byte[]> downloadDocument(@PathVariable Long id) {
         try {
+            // Get document metadata first to get the filename
+            DocumentDTO doc = documentService.getDocument(id);
+            if (doc == null) {
+                log.warn("Document not found: {}", id);
+                return ResponseEntity.notFound().build();
+            }
+
+            // Download file content (decompresses if needed)
             byte[] content = documentService.downloadDocument(id);
             if (content != null) {
+                String filename = doc.getFilename() != null ? doc.getFilename() : "document.pdf";
+
+                log.info("Download successful - Document: {}, Size: {} bytes, Compressed: {}",
+                    doc.getFilename(), content.length, doc.isCompressed());
+
                 return ResponseEntity.ok()
                     .header("Content-Type", "application/octet-stream")
-                    .header("Content-Disposition", "attachment; filename=\"document.pdf\"")
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                     .body(content);
             }
+
+            log.warn("Document content is null: {}", id);
             return ResponseEntity.notFound().build();
+
         } catch (IOException e) {
+            log.error("Failed to download document {}: {} - {}", id, e.getClass().getSimpleName(), e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (Exception e) {
+            log.error("Unexpected error downloading document {}: {}", id, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
