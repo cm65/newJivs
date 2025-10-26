@@ -1,0 +1,226 @@
+# Prometheus Alert Rules for JiVS Migration Workflow
+# Save to: /etc/prometheus/rules/jivs-workflow-alerts.yml
+
+groups:
+  - name: jivs_migration_critical
+    interval: 30s
+    rules:
+      # Critical: High failure rate
+      - alert: MigrationHighFailureRate
+        expr: |
+          (
+            rate(migrations_failed_total[5m])
+            /
+            rate(migrations_started_total[5m])
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: migration
+          team: data-platform
+        annotations:
+          summary: "Migration failure rate is above 5%"
+          description: "{{ $value | humanizePercentage }} of migrations are failing in the last 5 minutes"
+          runbook_url: "https://wiki.company.com/jivs/runbooks/high-failure-rate"
+
+      # Critical: Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: |
+          resilience4j_circuitbreaker_state == 1
+        for: 5m
+        labels:
+          severity: critical
+          component: "{{ $labels.name }}"
+        annotations:
+          summary: "Circuit breaker {{ $labels.name }} is OPEN"
+          description: "Circuit breaker has been open for 5 minutes, indicating persistent failures"
+          runbook_url: "https://wiki.company.com/jivs/runbooks/circuit-breaker-open"
+
+      # Critical: Thread pool saturation
+      - alert: ThreadPoolSaturated
+        expr: |
+          (
+            executor_active_threads
+            /
+            executor_pool_size
+          ) * 100 > 95
+        for: 10m
+        labels:
+          severity: critical
+          component: "{{ $labels.name }}"
+        annotations:
+          summary: "Thread pool {{ $labels.name }} is saturated"
+          description: "Thread pool utilization is {{ $value | humanizePercentage }} for 10 minutes"
+          runbook_url: "https://wiki.company.com/jivs/runbooks/thread-pool-saturation"
+
+      # Critical: Database connection pool exhausted
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          hikaricp_connections_active{pool="JiVSMigrationPool"} >= 48
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value }} out of 50 connections are active"
+          runbook_url: "https://wiki.company.com/jivs/runbooks/connection-pool-exhausted"
+
+      # Critical: Active migrations stuck
+      - alert: MigrationsStuck
+        expr: |
+          migrations_active > 0
+          and
+          changes(migrations_completed_total[30m]) == 0
+          and
+          changes(migrations_failed_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: critical
+          component: migration
+        annotations:
+          summary: "{{ $value }} migrations appear stuck"
+          description: "Active migrations exist but no completions or failures in 30 minutes"
+          runbook_url: "https://wiki.company.com/jivs/runbooks/stuck-migrations"
+
+  - name: jivs_migration_warning
+    interval: 60s
+    rules:
+      # Warning: Elevated failure rate
+      - alert: MigrationElevatedFailureRate
+        expr: |
+          (
+            rate(migrations_failed_total[5m])
+            /
+            rate(migrations_started_total[5m])
+          ) * 100 > 1
+        for: 15m
+        labels:
+          severity: warning
+          component: migration
+        annotations:
+          summary: "Migration failure rate is elevated"
+          description: "{{ $value | humanizePercentage }} of migrations are failing"
+
+      # Warning: Slow migrations
+      - alert: MigrationsRunningSlowly
+        expr: |
+          histogram_quantile(0.95, rate(migration_duration_seconds_bucket[10m])) > 3600
+        for: 15m
+        labels:
+          severity: warning
+          component: migration
+        annotations:
+          summary: "Migrations are running slowly"
+          description: "p95 migration duration is {{ $value | humanizeDuration }}"
+
+      # Warning: Event queue backup
+      - alert: EventQueueBackup
+        expr: |
+          events_fallback_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: events
+        annotations:
+          summary: "Event fallback queue has {{ $value }} pending events"
+          description: "WebSocket publishing may be failing"
+
+      # Warning: High thread pool utilization
+      - alert: ThreadPoolHighUtilization
+        expr: |
+          (
+            executor_active_threads
+            /
+            executor_pool_size
+          ) * 100 > 85
+        for: 15m
+        labels:
+          severity: warning
+          component: "{{ $labels.name }}"
+        annotations:
+          summary: "Thread pool {{ $labels.name }} utilization is high"
+          description: "Utilization is {{ $value | humanizePercentage }}"
+
+      # Warning: Redis connection issues
+      - alert: RedisConnectionFailures
+        expr: |
+          rate(lettuce_command_completion_seconds_count{status="FAILED"}[5m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis connection failures detected"
+          description: "{{ $value }} failures per second in the last 5 minutes"
+
+      # Warning: RabbitMQ queue depth growing
+      - alert: RabbitMQQueueDepthGrowing
+        expr: |
+          rabbitmq_queue_messages_ready{queue="migration.planning"} > 100
+        for: 15m
+        labels:
+          severity: warning
+          component: rabbitmq
+        annotations:
+          summary: "RabbitMQ queue {{ $labels.queue }} has {{ $value }} unprocessed messages"
+          description: "Message consumers may not be keeping up"
+
+      # Warning: Database connection pool high utilization
+      - alert: DatabaseConnectionPoolHighUtilization
+        expr: |
+          (
+            hikaricp_connections_active{pool="JiVSMigrationPool"}
+            /
+            hikaricp_connections_max{pool="JiVSMigrationPool"}
+          ) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database connection pool is {{ $value | humanizePercentage }} utilized"
+          description: "Consider increasing pool size if sustained"
+
+  - name: jivs_migration_info
+    interval: 300s
+    rules:
+      # Info: Low migration throughput
+      - alert: LowMigrationThroughput
+        expr: |
+          rate(migrations_started_total[10m]) * 60 < 5
+        for: 30m
+        labels:
+          severity: info
+          component: migration
+        annotations:
+          summary: "Migration throughput is low"
+          description: "Only {{ $value }} migrations started per minute in the last 10 minutes"
+
+      # Info: Idle system
+      - alert: NoActiveMigrations
+        expr: |
+          migrations_active == 0
+        for: 2h
+        labels:
+          severity: info
+          component: migration
+        annotations:
+          summary: "No active migrations for 2 hours"
+          description: "System may be idle or migrations are not being scheduled"
+
+      # Info: High record failure rate
+      - alert: HighRecordFailureRate
+        expr: |
+          (
+            rate(migration_records_failed_total[10m])
+            /
+            rate(migration_records_processed_total[10m])
+          ) * 100 > 5
+        for: 20m
+        labels:
+          severity: info
+          component: migration
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of records are failing"
+          description: "Data quality or transformation issues may exist"

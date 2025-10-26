@@ -1,6 +1,7 @@
 package com.jivs.platform.config;
 
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -38,5 +39,21 @@ public class AsyncConfig implements AsyncConfigurer {
                 log.error("Parameter: {}", param);
             }
         };
+    }
+
+    /**
+     * Dedicated executor for workflow orchestration
+     */
+    @Bean(name = "workflowExecutor")
+    public Executor workflowExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(20);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("workflow-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(120);
+        executor.initialize();
+        return executor;
     }
 }

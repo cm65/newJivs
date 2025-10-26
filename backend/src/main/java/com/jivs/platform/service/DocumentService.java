@@ -43,9 +43,6 @@ import java.util.stream.Stream;
 @Slf4j
 public class DocumentService {
 
-    // Explicit log field to work around Lombok @Slf4j compilation issue
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DocumentService.class);
-
     private final DocumentRepository documentRepository;
     private final StorageService storageService;
     private final SearchService searchService;

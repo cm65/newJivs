@@ -1,0 +1,297 @@
+{
+  "dashboard": {
+    "title": "JiVS Migration Workflow Monitoring",
+    "tags": ["jivs", "migration", "workflow"],
+    "timezone": "browser",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Migrations",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "migrations_active",
+            "legendFormat": "Active Migrations"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 30, "color": "yellow"},
+                {"value": 45, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Migration Throughput (per minute)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "rate(migrations_started_total[5m]) * 60",
+            "legendFormat": "Started"
+          },
+          {
+            "expr": "rate(migrations_completed_total[5m]) * 60",
+            "legendFormat": "Completed"
+          },
+          {
+            "expr": "rate(migrations_failed_total[5m]) * 60",
+            "legendFormat": "Failed"
+          }
+        ],
+        "yaxes": [
+          {"label": "Migrations/min", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Failure Rate (%)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "(rate(migrations_failed_total[5m]) / rate(migrations_started_total[5m])) * 100",
+            "legendFormat": "Failure Rate"
+          }
+        ],
+        "alert": {
+          "name": "High Migration Failure Rate",
+          "conditions": [
+            {
+              "evaluator": {"params": [1], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Migration failure rate exceeds 1%",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Migration Duration (Percentiles)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(migration_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(migration_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(migration_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {"label": "Duration (seconds)", "show": true, "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Thread Pool Utilization",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "(executor_active_threads{name=\"migration-exec\"} / executor_pool_size{name=\"migration-exec\"}) * 100",
+            "legendFormat": "Migration Executor"
+          },
+          {
+            "expr": "(executor_active_threads{name=\"load-exec\"} / executor_pool_size{name=\"load-exec\"}) * 100",
+            "legendFormat": "Load Executor"
+          },
+          {
+            "expr": "(executor_active_threads{name=\"extract-exec\"} / executor_pool_size{name=\"extract-exec\"}) * 100",
+            "legendFormat": "Extraction Executor"
+          }
+        ],
+        "yaxes": [
+          {"label": "Utilization (%)", "show": true, "max": 100, "min": 0},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Circuit Breaker States",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 12, "x": 0, "y": 20},
+        "targets": [
+          {
+            "expr": "resilience4j_circuitbreaker_state{name=\"migration-load\"}",
+            "legendFormat": "Load Service"
+          },
+          {
+            "expr": "resilience4j_circuitbreaker_state{name=\"extraction-service\"}",
+            "legendFormat": "Extraction Service"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "0", "text": "CLOSED", "color": "green"},
+              {"type": "value", "value": "1", "text": "OPEN", "color": "red"},
+              {"type": "value", "value": "2", "text": "HALF_OPEN", "color": "yellow"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Database Connection Pool",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "hikaricp_connections_active{pool=\"JiVSMigrationPool\"}",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "hikaricp_connections_idle{pool=\"JiVSMigrationPool\"}",
+            "legendFormat": "Idle Connections"
+          },
+          {
+            "expr": "hikaricp_connections_pending{pool=\"JiVSMigrationPool\"}",
+            "legendFormat": "Pending Connections"
+          },
+          {
+            "expr": "hikaricp_connections_max{pool=\"JiVSMigrationPool\"}",
+            "legendFormat": "Max Connections"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Event Publishing Fallback Queue",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "events_fallback_queue_size",
+            "legendFormat": "Queue Size"
+          }
+        ],
+        "alert": {
+          "name": "Event Queue Backup",
+          "conditions": [
+            {
+              "evaluator": {"params": [100], "type": "gt"},
+              "query": {"params": ["A", "5m", "now"]}
+            }
+          ],
+          "message": "Event fallback queue has more than 100 pending events"
+        }
+      },
+      {
+        "id": 9,
+        "title": "Records Processed",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(migration_records_processed_total[5m])",
+            "legendFormat": "Processed/sec"
+          },
+          {
+            "expr": "rate(migration_records_failed_total[5m])",
+            "legendFormat": "Failed/sec"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Phase Durations",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "rate(migration_phase_extraction_duration_seconds_sum[5m]) / rate(migration_phase_extraction_duration_seconds_count[5m])",
+            "legendFormat": "Extraction (avg)"
+          },
+          {
+            "expr": "rate(migration_phase_transformation_duration_seconds_sum[5m]) / rate(migration_phase_transformation_duration_seconds_count[5m])",
+            "legendFormat": "Transformation (avg)"
+          },
+          {
+            "expr": "rate(migration_phase_loading_duration_seconds_sum[5m]) / rate(migration_phase_loading_duration_seconds_count[5m])",
+            "legendFormat": "Loading (avg)"
+          }
+        ],
+        "yaxes": [
+          {"label": "Duration (seconds)", "show": true, "format": "s"},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Redis Operations",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "rate(lettuce_command_completion_seconds_count{command=\"get\"}[5m])",
+            "legendFormat": "GET ops/sec"
+          },
+          {
+            "expr": "rate(lettuce_command_completion_seconds_count{command=\"set\"}[5m])",
+            "legendFormat": "SET ops/sec"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "RabbitMQ Message Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "rate(rabbitmq_queue_messages_published_total{queue=\"migration.planning\"}[5m])",
+            "legendFormat": "Published"
+          },
+          {
+            "expr": "rate(rabbitmq_queue_messages_consumed_total{queue=\"migration.planning\"}[5m])",
+            "legendFormat": "Consumed"
+          }
+        ]
+      }
+    ]
+  }
+}

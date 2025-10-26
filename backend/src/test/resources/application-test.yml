@@ -39,9 +39,155 @@ spring:
     host: localhost
     port: 5672
 
+# Migration Module Test Configuration
+jivs:
+  migration:
+    executor:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 50
+      thread-name-prefix: test-migration-
+    validation:
+      timeout-seconds: 30
+      max-errors: 100
+    load:
+      batch-size: 100
+      max-retry-attempts: 2
+      timeout-seconds: 60
+    # Test-specific allowed systems
+    allowed-source-systems:
+      - postgresql
+      - mysql
+      - h2
+      - csv
+      - json
+    allowed-target-systems:
+      - postgresql
+      - h2
+    # Test table whitelist
+    allowed-tables:
+      - test_table
+      - test_users
+      - test_products
+      - test_orders
+      - migration_projects
+      - migration_audit_log
+
+  security:
+    jwt:
+      secret: test-secret-key-for-jwt-token-generation-minimum-256-bits
+      expiration: 3600000 # 1 hour for tests
+    cors:
+      allowed-origins: http://localhost:3001,http://localhost:3000
+
 logging:
   level:
     root: WARN
     com.jivs: INFO
+    com.jivs.platform.service.migration: DEBUG  # Debug level for migration tests
     org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+
+---
+# Profile: H2 In-Memory Database (Fast Unit Tests)
+spring:
+  config:
+    activate:
+      on-profile: h2
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+---
+# Profile: Integration Tests (Real PostgreSQL)
+spring:
+  config:
+    activate:
+      on-profile: integration-test
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jivs_integration_test
+    username: jivs_test_user
+    password: test_password
+  flyway:
+    enabled: true  # Enable Flyway for integration tests
+    clean-disabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Use Flyway migrations instead
+
+jivs:
+  migration:
+    executor:
+      core-pool-size: 4
+      max-pool-size: 8
+
+logging:
+  level:
+    com.jivs.platform.service.migration: DEBUG
+    org.hibernate.SQL: DEBUG
+
+---
+# Profile: Performance Tests (Optimized Settings)
+spring:
+  config:
+    activate:
+      on-profile: performance-test
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 10000
+
+jivs:
+  migration:
+    executor:
+      core-pool-size: 8
+      max-pool-size: 16
+      queue-capacity: 200
+    load:
+      batch-size: 1000  # Larger batches for performance tests
+      parallelism: 8
+
+logging:
+  level:
+    com.jivs.platform.service.migration: INFO  # Less verbose for perf tests
+    org.hibernate.SQL: WARN
+
+---
+# Profile: CI Pipeline (GitHub Actions)
+spring:
+  config:
+    activate:
+      on-profile: ci
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jivs_test}
+    username: ${SPRING_DATASOURCE_USERNAME:jivs_test_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:test_password}
+    hikari:
+      maximum-pool-size: 5  # Lower for CI resources
+  redis:
+    host: ${SPRING_REDIS_HOST:localhost}
+    port: ${SPRING_REDIS_PORT:6379}
+
+jivs:
+  migration:
+    executor:
+      core-pool-size: 2
+      max-pool-size: 4
+    validation:
+      timeout-seconds: 60  # Longer timeout for CI
+    load:
+      timeout-seconds: 120
+
+logging:
+  level:
+    com.jivs.platform.service.migration: INFO
     org.hibernate.SQL: WARN

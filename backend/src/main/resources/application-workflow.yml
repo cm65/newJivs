@@ -1,0 +1,268 @@
+# JiVS Workflow Orchestration Configuration
+# Applied fixes for distributed consistency, retry logic, and performance
+
+spring:
+  application:
+    name: jivs-platform
+
+  # Database connection pooling (optimized for workflow load)
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      pool-name: JiVSMigrationPool
+
+      # Connection test queries
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+
+      # Monitoring
+      register-mbeans: true
+
+  # Redis configuration (for distributed locking and caching)
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    timeout: 2000ms
+
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 10
+        max-wait: 1000ms
+      shutdown-timeout: 200ms
+
+  # RabbitMQ configuration (for async messaging)
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    virtual-host: /
+
+    # Connection recovery
+    connection-timeout: 10000
+    requested-heartbeat: 30
+
+    # Publisher confirms for idempotency
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
+    listener:
+      simple:
+        # Retry configuration
+        retry:
+          enabled: true
+          initial-interval: 1000
+          max-attempts: 3
+          max-interval: 10000
+          multiplier: 2.0
+
+        # Concurrency
+        concurrency: 5
+        max-concurrency: 10
+
+        # Acknowledgement
+        acknowledge-mode: auto
+        prefetch: 10
+
+# Resilience4j configuration (retry, circuit breaker, rate limiting)
+resilience4j:
+  retry:
+    instances:
+      migration-operations:
+        max-attempts: 3
+        wait-duration: 2s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.sql.SQLException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.dao.DataAccessException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+          - java.lang.IllegalStateException
+
+  circuitbreaker:
+    instances:
+      migration-load:
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 30s
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        sliding-window-type: COUNT_BASED
+
+      extraction-service:
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        sliding-window-size: 10
+        minimum-number-of-calls: 3
+
+  timelimiter:
+    instances:
+      migration-timeout:
+        timeout-duration: 30m
+        cancel-running-future: true
+
+      extraction-timeout:
+        timeout-duration: 15m
+        cancel-running-future: true
+
+      load-timeout:
+        timeout-duration: 20m
+        cancel-running-future: true
+
+  bulkhead:
+    instances:
+      migration-bulkhead:
+        max-concurrent-calls: 50
+        max-wait-duration: 500ms
+
+# JiVS Migration Configuration
+jivs:
+  migration:
+    # Executor configuration
+    executor:
+      core-pool-size: ${MIGRATION_CORE_POOL:10}
+      max-pool-size: ${MIGRATION_MAX_POOL:50}
+      queue-capacity: ${MIGRATION_QUEUE:500}
+      await-termination-seconds: 60
+
+    # Distributed locking
+    lock:
+      enabled: true
+      wait-time-seconds: 30
+      lease-time-seconds: 300
+
+    # Checkpointing
+    checkpoint:
+      enabled: true
+      interval-seconds: 60
+
+    # Retry configuration
+    retry:
+      max-attempts: 3
+      initial-delay-ms: 2000
+      max-delay-ms: 10000
+      multiplier: 2.0
+
+    # Performance tuning
+    performance:
+      max-parallelism: 20
+      default-batch-size: 1000
+      max-batch-size: 10000
+
+  # Load service configuration
+  load:
+    executor:
+      core-pool-size: ${LOAD_CORE_POOL:20}
+      max-pool-size: ${LOAD_MAX_POOL:100}
+      queue-capacity: 1000
+      await-termination-seconds: 120
+
+    # Connection management
+    connection:
+      max-wait-ms: 30000
+      validation-timeout-ms: 5000
+
+  # Extraction service configuration
+  extraction:
+    executor:
+      core-pool-size: ${EXTRACT_CORE_POOL:15}
+      max-pool-size: ${EXTRACT_MAX_POOL:60}
+      queue-capacity: 500
+      await-termination-seconds: 90
+
+    # Timeout configuration
+    timeout:
+      default-seconds: 300
+      max-seconds: 900
+
+  # Event publishing configuration
+  events:
+    retry:
+      enabled: true
+      max-attempts: 3
+      delay-ms: 100
+
+    fallback:
+      enabled: true
+      retry-interval-seconds: 10
+      max-queue-size: 1000
+
+# Actuator and metrics configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,threaddump,heapdump
+      base-path: /actuator
+
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+    metrics:
+      enabled: true
+
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 10s
+
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+        "[migration.duration]": true
+        "[migration.phase.extraction.duration]": true
+        "[migration.phase.transformation.duration]": true
+        "[migration.phase.loading.duration]": true
+
+      percentiles:
+        "[http.server.requests]": 0.5, 0.95, 0.99
+        "[migration.duration]": 0.5, 0.95, 0.99
+
+    tags:
+      application: ${spring.application.name}
+      environment: ${SPRING_PROFILES_ACTIVE:dev}
+
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+
+# Logging configuration
+logging:
+  level:
+    com.jivs.platform.service.migration: DEBUG
+    com.jivs.platform.service.migration.MigrationOrchestrator: DEBUG
+    com.jivs.platform.event: DEBUG
+    io.github.resilience4j: DEBUG
+    org.redisson: INFO
+    org.springframework.amqp: INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  file:
+    name: logs/jivs-workflow.log
+    max-size: 100MB
+    max-history: 30
