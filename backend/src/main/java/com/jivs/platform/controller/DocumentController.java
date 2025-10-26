@@ -228,6 +228,60 @@ public class DocumentController {
     }
 
     /**
+     * Diagnostic endpoint to check file compression status
+     */
+    @GetMapping("/{id}/diagnostic")
+    @PreAuthorize("hasAnyRole('ADMIN')")
+    @Operation(summary = "Diagnostic info", description = "Check file status on disk")
+    public ResponseEntity<Map<String, Object>> diagnosticDocument(@PathVariable Long id) {
+        try {
+            DocumentDTO doc = documentService.getDocument(id);
+            if (doc == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Map<String, Object> diagnostic = new HashMap<>();
+            diagnostic.put("documentId", id);
+            diagnostic.put("filename", doc.getFilename());
+            diagnostic.put("dbCompressed", doc.isCompressed());
+            diagnostic.put("dbArchived", doc.isArchived());
+            diagnostic.put("dbCompressionRatio", doc.getCompressionRatio());
+            diagnostic.put("storagePath", doc.getStoragePath());
+
+            // Check if file exists and read first bytes
+            if (doc.getStoragePath() != null) {
+                java.nio.file.Path filePath = java.nio.file.Paths.get(doc.getStoragePath());
+                if (java.nio.file.Files.exists(filePath)) {
+                    diagnostic.put("fileExists", true);
+                    diagnostic.put("fileSizeOnDisk", java.nio.file.Files.size(filePath));
+
+                    // Read first 2 bytes to check GZIP magic number
+                    byte[] header = new byte[2];
+                    try (java.io.InputStream is = java.nio.file.Files.newInputStream(filePath)) {
+                        is.read(header);
+                        boolean isGzipFile = (header[0] == 0x1F && header[1] == (byte)0x8B);
+                        diagnostic.put("actuallyCompressed", isGzipFile);
+                        diagnostic.put("fileHeader", String.format("0x%02X%02X", header[0], header[1]));
+
+                        if (isGzipFile != doc.isCompressed()) {
+                            diagnostic.put("WARNING", "DB compressed flag doesn't match actual file format!");
+                        }
+                    }
+                } else {
+                    diagnostic.put("fileExists", false);
+                }
+            }
+
+            return ResponseEntity.ok(diagnostic);
+
+        } catch (Exception e) {
+            log.error("Diagnostic failed: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Archive a single document (compress file)
      */
     @PostMapping("/{id}/archive")
