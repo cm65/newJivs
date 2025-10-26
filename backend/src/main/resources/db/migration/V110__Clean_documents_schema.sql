@@ -45,23 +45,33 @@ ALTER COLUMN size SET NOT NULL;
 
 -- Add unique constraint on checksum for duplicate prevention
 -- Only for non-null checksums (allows multiple NULL values)
+-- Drop existing index first if it exists from previous failed migration
+DROP INDEX IF EXISTS unique_checksum;
 CREATE UNIQUE INDEX unique_checksum ON documents(checksum) WHERE checksum IS NOT NULL;
 
 -- Add check constraint for file size (min 1 byte, max 500MB)
-ALTER TABLE documents
-ADD CONSTRAINT check_file_size CHECK (size > 0 AND size <= 524288000);
+DO $$ BEGIN
+    ALTER TABLE documents ADD CONSTRAINT check_file_size CHECK (size > 0 AND size <= 524288000);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add check constraint for storage tier
-ALTER TABLE documents
-ADD CONSTRAINT check_storage_tier CHECK (storage_tier IS NULL OR storage_tier IN ('HOT', 'WARM', 'COLD'));
+DO $$ BEGIN
+    ALTER TABLE documents ADD CONSTRAINT check_storage_tier CHECK (storage_tier IS NULL OR storage_tier IN ('HOT', 'WARM', 'COLD'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add check constraint for status
-ALTER TABLE documents
-ADD CONSTRAINT check_status CHECK (status IN ('ACTIVE', 'ARCHIVED', 'DELETED'));
+DO $$ BEGIN
+    ALTER TABLE documents ADD CONSTRAINT check_status CHECK (status IN ('ACTIVE', 'ARCHIVED', 'DELETED'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add check constraint for compression ratio (0.0 to 1.0)
-ALTER TABLE documents
-ADD CONSTRAINT check_compression_ratio CHECK (compression_ratio IS NULL OR (compression_ratio >= 0.0 AND compression_ratio <= 1.0));
+DO $$ BEGIN
+    ALTER TABLE documents ADD CONSTRAINT check_compression_ratio CHECK (compression_ratio IS NULL OR (compression_ratio >= 0.0 AND compression_ratio <= 1.0));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add index on compressed flag for quick filtering
 CREATE INDEX IF NOT EXISTS idx_documents_compressed ON documents(compressed) WHERE compressed = true;
