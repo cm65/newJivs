@@ -262,9 +262,14 @@ public class SearchService {
      */
     private List<Document> searchDocumentsInDatabase(String query) {
         if (query == null || query.trim().isEmpty()) {
-            // Return recent documents if no query
+            // Return recent documents sorted by newest first if no query
             return documentRepository.findAll()
                 .stream()
+                .sorted((d1, d2) -> {
+                    if (d1.getCreatedDate() == null) return 1;
+                    if (d2.getCreatedDate() == null) return -1;
+                    return d2.getCreatedDate().compareTo(d1.getCreatedDate()); // Descending order (newest first)
+                })
                 .limit(20)
                 .collect(Collectors.toList());
         }
@@ -272,6 +277,7 @@ public class SearchService {
         String searchPattern = "%" + query.toLowerCase() + "%";
         List<Document> allDocs = documentRepository.findAll();
 
+        // Filter documents using partial keyword matching (supports partial search!)
         return allDocs.stream()
             .filter(doc ->
                 (doc.getTitle() != null && doc.getTitle().toLowerCase().contains(query.toLowerCase())) ||
@@ -281,6 +287,12 @@ public class SearchService {
                 (doc.getTags() != null && doc.getTags().stream()
                     .anyMatch(tag -> tag.toLowerCase().contains(query.toLowerCase())))
             )
+            // Sort results by newest first for better user experience
+            .sorted((d1, d2) -> {
+                if (d1.getCreatedDate() == null) return 1;
+                if (d2.getCreatedDate() == null) return -1;
+                return d2.getCreatedDate().compareTo(d1.getCreatedDate());
+            })
             .collect(Collectors.toList());
     }
 

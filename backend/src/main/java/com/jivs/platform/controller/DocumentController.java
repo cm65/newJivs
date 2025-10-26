@@ -153,11 +153,20 @@ public class DocumentController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
-    @Operation(summary = "Get all documents", description = "Get all documents with pagination")
+    @Operation(summary = "Get all documents", description = "Get all documents with pagination, sorted by newest first")
     public ResponseEntity<Page<DocumentDTO>> getAllDocuments(
             @Parameter(description = "Pagination parameters") Pageable pageable,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "archived", required = false) Boolean archived) {
+
+        // If no sort is specified, default to newest first (sort by createdDate descending)
+        if (pageable.getSort().isUnsorted()) {
+            pageable = org.springframework.data.domain.PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdDate")
+            );
+        }
 
         Page<DocumentDTO> documents = documentService.getAllDocuments(pageable, status, archived);
         return ResponseEntity.ok(documents);
