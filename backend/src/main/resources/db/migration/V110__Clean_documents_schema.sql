@@ -25,7 +25,7 @@ DROP COLUMN IF EXISTS thumbnail_path CASCADE,
 DROP COLUMN IF EXISTS created_by CASCADE,
 DROP COLUMN IF EXISTS updated_by CASCADE,
 DROP COLUMN IF EXISTS created_at CASCADE,
-DROP COLUMN IF NOT EXISTS updated_at CASCADE;
+DROP COLUMN IF EXISTS updated_at CASCADE;
 
 -- Drop unused V7 indexes
 DROP INDEX IF EXISTS idx_documents_document_id;
@@ -40,9 +40,8 @@ ALTER COLUMN filename SET NOT NULL,
 ALTER COLUMN file_type SET NOT NULL,
 ALTER COLUMN size SET NOT NULL;
 
--- Make storage_path NOT NULL where it exists
-ALTER TABLE documents
-ALTER COLUMN storage_path SET NOT NULL WHERE storage_path IS NOT NULL;
+-- Note: storage_path can be NULL for documents not yet stored
+-- It will be set when the document is actually uploaded
 
 -- Add unique constraint on checksum for duplicate prevention
 -- Only for non-null checksums (allows multiple NULL values)
